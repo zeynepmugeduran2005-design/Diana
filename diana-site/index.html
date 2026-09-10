@@ -1,0 +1,3389 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#100c2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DIANA">
+<title>DIANA — Aydınlık Rota</title>
+<meta name="description" content="Şehirde gece hareket ederken en aydınlık ve en güvenli yolu bulmanı sağlayan topluluk uygulaması.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#100c2e;          /* gece */
+  --ink-2:#191243;        /* yükseltilmiş yüzey */
+  --ink-3:#241a5c;        /* kenar */
+  --halo:#ffc861;         /* sokak lambası */
+  --halo-soft:#ffe0a8;
+  --mint:#74e0b4;         /* doğrulanmış */
+  --signal:#ff6b8a;       /* uyarı */
+  --paper:#efeaff;
+  --muted:#a79fd0;
+  --r-s:10px; --r-m:18px; --r-l:28px;
+  --sheet-h:56vh;
+  --font-d:"Bricolage Grotesque",'Segoe UI',system-ui,sans-serif;
+  --font-b:"Inter",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0;background:#08061a;color:var(--paper);
+  font-family:var(--font-b);font-size:15px;line-height:1.5;
+  overscroll-behavior:none;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:2px solid var(--halo);outline-offset:2px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* --- telefon kabuğu --- */
+.shell{
+  position:relative;width:100%;max-width:430px;height:100dvh;margin:0 auto;
+  background:var(--ink);overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 0 0 1px #2a1f66, 0 40px 120px rgba(0,0,0,.7);
+}
+@media(min-width:900px){
+  body{display:grid;place-items:center;background:radial-gradient(1200px 800px at 50% -10%,#1b1450,#06041a)}
+  .shell{height:min(920px,96dvh);border-radius:34px}
+}
+
+/* --- giriş ekranı --- */
+#auth{position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;background:var(--ink);overflow-y:auto}
+.lampfield{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.lampfield i{
+  position:absolute;width:5px;height:5px;border-radius:50%;background:var(--halo);
+  opacity:0;box-shadow:0 0 0 rgba(255,200,97,.6);
+  animation:lampOn .9s cubic-bezier(.2,.9,.3,1) forwards;
+}
+@keyframes lampOn{
+  0%{opacity:0;box-shadow:0 0 0 0 rgba(255,200,97,0)}
+  60%{opacity:1;box-shadow:0 0 26px 6px rgba(255,200,97,.35)}
+  100%{opacity:.85;box-shadow:0 0 16px 3px rgba(255,200,97,.22)}
+}
+.auth-inner{position:relative;padding:34px 26px 30px;display:flex;flex-direction:column;min-height:100%}
+.wordmark{font-family:"Cinzel",Georgia,serif;font-weight:700;font-size:37px;letter-spacing:.11em;line-height:1;margin:22px 0 6px}
+.wordmark span{display:block;font-size:15px;font-weight:500;letter-spacing:.01em;color:var(--halo-soft);font-family:var(--font-b);margin-top:10px}
+.auth-lede{color:var(--muted);max-width:30ch;margin:14px 0 26px}
+.segmented{display:flex;gap:4px;background:var(--ink-2);padding:4px;border-radius:999px;margin-bottom:18px}
+.segmented button{flex:1;padding:10px;border-radius:999px;color:var(--muted);font-weight:600;font-size:14px}
+.segmented button[aria-selected="true"]{background:var(--halo);color:#2a1c00}
+label.field{display:block;margin-bottom:12px}
+label.field span{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+input[type=text],input[type=email],input[type=password],textarea,select{
+  width:100%;background:var(--ink-2);border:1px solid var(--ink-3);border-radius:var(--r-s);
+  padding:13px 14px;color:var(--paper);
+}
+input::placeholder,textarea::placeholder{color:#6f66a3}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.check{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--muted);cursor:pointer}
+.check input{width:18px;height:18px;accent-color:var(--halo)}
+.btn{display:block;width:100%;padding:15px;border-radius:var(--r-s);font-weight:600;text-align:center}
+.btn-primary{background:var(--halo);color:#2a1c00}
+.btn-primary:active{background:var(--halo-soft)}
+.btn-ghost{background:var(--ink-2);color:var(--paper);border:1px solid var(--ink-3)}
+.btn-line{background:none;color:var(--halo);text-decoration:underline;text-underline-offset:4px;font-size:14px;padding:12px 0}
+.err{color:var(--signal);font-size:13.5px;min-height:20px;margin:8px 0 0}
+.edu-hint{font-size:13px;color:var(--mint);margin-top:8px}
+.auth-foot{margin-top:auto;padding-top:22px;color:#7f76b5;font-size:12.5px}
+
+/* --- paket kartları --- */
+.plans{display:flex;flex-direction:column;gap:12px}
+.plan{
+  border:1px solid var(--ink-3);border-radius:var(--r-m);padding:16px 16px 14px;background:var(--ink-2);
+  position:relative;
+}
+.plan.hi{border-color:var(--halo);background:linear-gradient(180deg,rgba(255,200,97,.12),rgba(255,200,97,.03))}
+.plan h4{font-family:var(--font-d);font-size:19px;margin:0 0 2px;font-weight:700}
+.plan .who{color:var(--muted);font-size:13px;margin-bottom:12px}
+.price{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.price b{font-family:var(--font-d);font-size:26px;font-weight:800;letter-spacing:-.02em}
+.price small{color:var(--muted);font-size:13px}
+.plan ul{margin:12px 0 14px;padding:0;list-style:none;font-size:13.5px;color:#cfc7f5}
+.plan li{padding-left:18px;position:relative;margin-bottom:5px}
+.plan li::before{content:"";position:absolute;left:0;top:8px;width:7px;height:7px;border-radius:50%;background:var(--halo);box-shadow:0 0 8px 2px rgba(255,200,97,.4)}
+.tag{position:absolute;top:-9px;right:14px;background:var(--halo);color:#2a1c00;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+.tag.mint{background:var(--mint);color:#03301f}
+.seg-yearly{display:flex;gap:4px;background:var(--ink);padding:3px;border-radius:999px;margin:14px 0 4px;border:1px solid var(--ink-3)}
+.seg-yearly button{flex:1;padding:8px;border-radius:999px;font-size:13px;color:var(--muted);font-weight:600}
+.seg-yearly button[aria-selected="true"]{background:var(--ink-3);color:var(--paper)}
+
+/* --- uygulama iskeleti --- */
+#app{display:none;flex-direction:column;height:100%;position:relative}
+#app.on{display:flex}
+.topbar{
+  display:flex;align-items:center;gap:12px;padding:14px 16px 12px;
+  border-bottom:1px solid rgba(255,255,255,.06);position:relative;z-index:20;background:var(--ink);
+}
+.topbar h1{font-family:var(--font-d);font-size:19px;margin:0;font-weight:700;letter-spacing:-.02em}
+.topbar .sub{font-size:12px;color:var(--muted);margin-top:1px}
+.lamp-badge{
+  margin-left:auto;display:flex;align-items:center;gap:7px;background:var(--ink-2);
+  border:1px solid var(--ink-3);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;
+}
+.lamp-badge b{color:var(--halo)}
+.view{flex:1;overflow-y:auto;display:none;position:relative}
+.view.on{display:block}
+#view-map{overflow-y:auto}
+.pad{padding:16px 16px 24px}
+
+/* --- harita --- */
+#map{position:absolute;inset:0;background:#0d0a26}
+.leaflet-container{background:#0d0a26;font-family:var(--font-b)}
+#map.no-tiles::after{
+  content:"Döşemeler yüklenemedi. Sağ alttaki ◫ ile katman değiştir ya da harita-testi.html dosyasını aç.";
+  position:absolute;left:12px;right:12px;top:12px;z-index:500;font-size:12px;color:var(--muted);
+  background:rgba(16,12,46,.9);border:1px solid var(--ink-3);border-radius:10px;padding:8px 10px;
+}
+#map.no-tiles .leaflet-tile-pane{display:none}
+#map.osm-dark .leaflet-tile-pane{filter:invert(1) hue-rotate(190deg) brightness(.76) contrast(1.12) saturate(.55)}
+#map.osm-dark .leaflet-tile-pane::after{content:"";position:absolute;inset:0;background:#100c2e;opacity:.22;pointer-events:none}
+#map.no-tiles{background:
+  radial-gradient(900px 600px at 50% 40%, #1d1550, #0b0824),
+  repeating-linear-gradient(0deg,transparent 0 39px,rgba(255,255,255,.045) 39px 40px),
+  repeating-linear-gradient(90deg,transparent 0 39px,rgba(255,255,255,.045) 39px 40px);}
+.dot{position:relative;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.85)}
+.dot.me{background:#7cc9ff;box-shadow:0 0 0 6px rgba(124,201,255,.18)}
+.pulse{animation:pulse 2.4s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(124,201,255,.35)}100%{box-shadow:0 0 0 22px rgba(124,201,255,0)}}
+.map-tools{position:absolute;z-index:500;left:10px;right:10px;top:10px;display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.map-tools::-webkit-scrollbar{display:none}
+.chip{
+  flex:0 0 auto;background:rgba(25,18,67,.92);border:1px solid var(--ink-3);color:var(--paper);
+  padding:8px 13px;border-radius:999px;font-size:13px;font-weight:500;backdrop-filter:blur(8px);
+}
+.chip[aria-pressed="true"]{background:var(--halo);color:#2a1c00;border-color:var(--halo)}
+#pickHint{
+  position:absolute;z-index:502;left:10px;right:10px;top:52px;background:var(--halo);color:#2a1c00;
+  border-radius:12px;padding:11px 14px;font-size:13px;font-weight:600;display:none;text-align:center;
+}
+#pickHint.on{display:block}
+.pickrow{display:flex;gap:8px;margin:6px 0 4px;flex-wrap:wrap}
+.pickrow .chip{flex:0 0 auto}
+.dot.start{background:#74e0b4;box-shadow:0 0 14px 3px rgba(116,224,180,.4)}
+.dot.end{background:#ffc861;box-shadow:0 0 14px 3px rgba(255,200,97,.45)}
+.dot.spot{width:22px;height:22px;background:#74e0b4;border:3px solid #0d0a26;
+  box-shadow:0 0 0 2px #74e0b4, 0 0 18px 5px rgba(116,224,180,.45)}
+.leaflet-tooltip.spotlab{background:#0f2a22;border-color:#2f6b56;color:#bff3de;font-weight:600}
+.map-fab{
+  position:absolute;z-index:500;right:10px;bottom:60px;width:44px;height:44px;border-radius:50%;
+  background:var(--ink-2);border:1px solid var(--ink-3);display:grid;place-items:center;font-size:18px;
+}
+.legend{
+  position:absolute;z-index:500;right:10px;top:56px;background:rgba(16,12,46,.88);border:1px solid var(--ink-3);
+  border-radius:12px;padding:9px 11px;font-size:11.5px;color:var(--muted);backdrop-filter:blur(8px);line-height:1.7
+}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+/* --- liste --- */
+.searchbar{position:sticky;top:0;background:var(--ink);padding:14px 16px 10px;z-index:5}
+.filters{display:flex;gap:7px;overflow-x:auto;padding:10px 16px 4px;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.place{
+  display:flex;gap:13px;align-items:flex-start;padding:14px 16px;
+  border-bottom:1px solid rgba(255,255,255,.055);width:100%;text-align:left;
+}
+.place:active{background:var(--ink-2)}
+.ring{
+  flex:0 0 auto;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--font-d);font-weight:800;font-size:15px;
+}
+.place h3{margin:0 0 2px;font-size:15.5px;font-weight:600}
+.place .meta{font-size:12.5px;color:var(--muted)}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--ink-2);border:1px solid var(--ink-3);color:#c9c1f0;margin-right:6px}
+.pill.mint{color:var(--mint);border-color:rgba(116,224,180,.35)}
+.empty{padding:52px 24px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--paper);font-family:var(--font-d);font-size:18px;margin-bottom:6px}
+
+/* --- ışık ölçer --- */
+.lamps{display:inline-flex;gap:4px;vertical-align:middle}
+.lamps i{width:9px;height:9px;border-radius:50%;background:#3a2f70;display:block}
+.lamps i.on{background:var(--halo);box-shadow:0 0 9px 1px rgba(255,200,97,.5)}
+.rate-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.rate-row .lbl{font-size:14px}
+.rate-row .lbl small{display:block;color:var(--muted);font-size:12px}
+.picker{display:flex;gap:6px}
+.picker button{width:26px;height:26px;border-radius:50%;background:#33296b;border:1px solid #443a85}
+.picker button.on{background:var(--halo);border-color:var(--halo);box-shadow:0 0 10px 1px rgba(255,200,97,.45)}
+
+/* --- rozet --- */
+.badges{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.badge{
+  border:1px solid var(--ink-3);border-radius:var(--r-m);padding:14px 10px;text-align:center;background:var(--ink-2);
+  opacity:.42;filter:grayscale(1);
+}
+.badge.got{opacity:1;filter:none;border-color:rgba(255,200,97,.45);background:linear-gradient(180deg,rgba(255,200,97,.13),transparent)}
+.badge .gl{width:36px;height:36px;margin:0 auto 8px;border-radius:50%;background:var(--ink-3);display:grid;place-items:center;font-family:var(--font-d);font-weight:800;color:var(--halo)}
+.badge.got .gl{background:var(--halo);color:#2a1c00;box-shadow:0 0 18px 2px rgba(255,200,97,.35)}
+.badge h4{margin:0 0 3px;font-size:13px;font-weight:600}
+.badge p{margin:0;font-size:11px;color:var(--muted);line-height:1.35}
+.level-card{border:1px solid var(--ink-3);border-radius:var(--r-l);padding:18px;background:radial-gradient(120% 100% at 0% 0%,rgba(255,200,97,.16),var(--ink-2))}
+.level-card .lv{font-family:var(--font-d);font-size:28px;font-weight:800;letter-spacing:-.02em}
+.bar{height:7px;border-radius:999px;background:#2c2266;margin-top:12px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--halo);border-radius:999px;transition:width .5s ease}
+
+/* --- Dia --- */
+#view-dia{display:none;flex-direction:column}
+#view-dia.on{display:flex}
+.chat{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:82%;padding:11px 14px;border-radius:16px;font-size:14.5px;line-height:1.55;white-space:pre-wrap}
+.msg.dia{background:var(--ink-2);border:1px solid var(--ink-3);border-bottom-left-radius:5px;align-self:flex-start}
+.msg.me{background:var(--halo);color:#2a1c00;border-bottom-right-radius:5px;align-self:flex-end}
+.msg.sys{align-self:center;background:none;border:1px dashed var(--ink-3);color:var(--muted);font-size:12.5px;text-align:center}
+.typing i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);margin-right:3px;animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.composer{display:flex;gap:8px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.07);background:var(--ink)}
+.composer input{flex:1;border-radius:999px}
+.composer button{width:46px;border-radius:50%;background:var(--halo);color:#2a1c00;font-weight:700;flex:0 0 46px}
+.quick{display:flex;gap:7px;overflow-x:auto;padding:0 12px 10px;scrollbar-width:none}
+.quick::-webkit-scrollbar{display:none}
+
+/* --- komünite --- */
+.com-intro{font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 14px}
+.com-compose{border:1px solid var(--ink-3);border-radius:18px;background:var(--ink-2);padding:14px;margin-bottom:18px}
+.com-compose textarea{min-height:66px;resize:vertical;margin-bottom:8px}
+.com-cats{display:flex;gap:7px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+.com-cats::-webkit-scrollbar{display:none}
+.com-cats .chip{flex:0 0 auto}
+.com-send-row{display:flex;gap:8px;align-items:center;margin-top:10px}
+.com-send-row input{flex:1;border-radius:999px;padding:11px 14px}
+.com-send-row .btn{width:auto;flex:0 0 auto;padding:11px 18px}
+.com-status{font-size:12.5px;color:var(--muted);margin:2px 2px 12px}
+.com-status.warn{color:var(--signal)}
+.post{border:1px solid var(--ink-3);border-radius:18px;background:var(--ink-2);padding:14px;margin-bottom:12px}
+.post .top{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.post .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;color:#fff;flex:0 0 40px}
+.post .who{min-width:0}
+.post .who b{font-size:14.5px;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.post .who span{font-size:12px;color:var(--muted)}
+.post .body{font-size:14.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.post .area{font-size:12.5px;color:var(--halo);margin-top:7px;font-weight:600}
+.post .acts{display:flex;gap:18px;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+.post .acts button{color:var(--muted);font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.post .acts button.on{color:var(--signal)}
+.post .replies{margin-top:11px;border-top:1px solid rgba(255,255,255,.06);padding-top:9px;display:none}
+.post .replies.on{display:block}
+.reply{font-size:13.5px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.reply:last-of-type{border-bottom:0}
+.reply b{font-weight:600}
+.reply .rt{color:var(--muted);font-size:11.5px;margin-left:6px}
+.reply-form{display:flex;gap:8px;margin-top:9px}
+.reply-form input{flex:1;border-radius:999px;padding:9px 13px}
+.reply-form button{flex:0 0 auto;background:var(--halo);color:#2a1c00;font-weight:700;border-radius:999px;padding:9px 15px}
+
+/* --- kadınlara özel doğrulama (yüz taraması) --- */
+.vwrap{position:relative;width:210px;height:210px;margin:10px auto 0;border-radius:50%;overflow:hidden;
+  border:2px solid var(--ink-3);background:#000;box-shadow:0 0 0 4px rgba(255,200,97,.14)}
+.vwrap video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+
+/* --- reklam bandı --- */
+#adbar{
+  display:flex;align-items:center;gap:11px;margin:0 10px 6px;padding:9px 11px;
+  background:var(--ink-2);border:1px solid var(--ink-3);border-radius:14px;min-height:56px;
+}
+#adbar .ad-k{font-size:9.5px;color:#9d94cf;letter-spacing:.06em;writing-mode:vertical-rl;transform:rotate(180deg)}
+#adbar .ad-t{font-size:13px;font-weight:600;line-height:1.3}
+#adbar .ad-s{font-size:11.5px;color:var(--muted);margin-top:1px}
+#adbar .ad-cta{margin-left:auto;background:var(--halo);color:#2a1c00;font-size:12px;font-weight:700;
+  padding:7px 12px;border-radius:999px;white-space:nowrap;text-decoration:none;display:inline-block}
+#adbar .ad-x{background:none;color:var(--muted);font-size:17px;line-height:1;padding:4px 2px 4px 6px}
+
+
+/* --- harita ekranı düzeni --- */
+.mapscreen{padding:12px 12px 20px;display:flex;flex-direction:column;gap:12px}
+.searchrow{display:flex;gap:10px;align-items:center}
+.searchwrap{flex:1;position:relative}
+.searchwrap svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);width:17px;height:17px;stroke:#8a80c0;fill:none;stroke-width:2}
+.searchwrap input{padding:14px 16px 14px 42px;border-radius:999px;background:var(--ink-2);border:1px solid var(--ink-3)}
+#destRes{border:1px solid var(--ink-3);border-radius:14px;overflow:hidden;background:var(--ink-2)}
+#destRes:empty{display:none}
+#destRes button{display:block;width:100%;text-align:left;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+#destRes b{font-size:14px;font-weight:600}
+#destRes span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.gobox{border:1px solid var(--ink-3);border-radius:18px;background:var(--ink-2);padding:6px 12px 12px}
+.gorow{display:flex;align-items:center;gap:10px}
+.gorow .gd{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+.gorow input{background:none;border:0;padding:13px 0;flex:1;min-width:0;border-radius:0}
+.gorow input:focus{outline:none}
+.gobtn{width:36px;height:36px;border-radius:50%;background:var(--ink);border:1px solid var(--ink-3);
+  display:grid;place-items:center;font-size:15px;color:var(--muted);flex:0 0 36px}
+.goline{height:1px;background:rgba(255,255,255,.09);margin-left:20px}
+.gores{border:1px solid var(--ink-3);border-radius:12px;overflow:hidden;margin:4px 0 2px;background:var(--ink)}
+.gores:empty{display:none}
+.gores button{display:block;width:100%;text-align:left;padding:11px 13px;border-bottom:1px solid rgba(255,255,255,.06)}
+.gores button:last-child{border-bottom:0}
+.gores b{font-size:14px;font-weight:600}
+.gores span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+#geoStatus{font-size:12.5px;line-height:1.5;margin-top:9px}
+#geoStatus:empty{display:none}
+#geoStatus.warn{color:var(--signal)}
+#geoStatus.ok{color:var(--mint)}
+#geoStatus.wait{color:var(--muted)}
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px}
+.mode{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px;border-radius:13px;
+  border:1px solid var(--ink-3);background:var(--ink);color:var(--muted);font-size:11px}
+.mode svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.mode[aria-pressed="true"]{background:var(--halo);border-color:var(--halo);color:#2a1c00;font-weight:600}
+.mode b{font-size:10.5px;font-weight:600;color:inherit}
+#navPanel{position:absolute;z-index:520;left:10px;right:10px;top:10px;background:rgba(16,12,46,.96);
+  border:1px solid var(--halo);border-radius:18px;padding:14px 15px;backdrop-filter:blur(12px);display:none}
+#navPanel.on{display:block}
+#navPanel .now{display:flex;align-items:flex-start;gap:12px}
+#navPanel .arw{width:38px;height:38px;border-radius:12px;background:var(--halo);color:#2a1c00;
+  display:grid;place-items:center;font-size:19px;font-weight:700;flex:0 0 38px}
+#navPanel .ins{font-family:var(--font-d);font-size:16.5px;font-weight:700;line-height:1.25}
+#navPanel .dist{font-size:12.5px;color:var(--halo);margin-top:2px;font-weight:600}
+#navPanel .nxt{font-size:12.5px;color:var(--muted);margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.09)}
+#navPanel .foot{display:flex;gap:8px;margin-top:11px}
+#navPanel .foot button{flex:1;padding:10px;border-radius:11px;font-size:12.5px;font-weight:600}
+#navPanel .sos{background:var(--signal);color:#fff;flex:0 0 74px!important}
+.steps{margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}
+.step-i{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13.5px}
+.step-i:last-child{border-bottom:0}
+.step-i em{font-style:normal;color:var(--halo);font-weight:600;font-size:12px;flex:0 0 58px;padding-top:1px}
+.shorts{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.short{display:flex;flex-direction:column;align-items:center;gap:6px}
+.short i{width:100%;aspect-ratio:1/1;max-height:60px;border-radius:17px;border:1px solid var(--ink-3);background:var(--ink-2);
+  display:grid;place-items:center;color:var(--muted)}
+.short i svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.short.set i{background:linear-gradient(160deg,rgba(255,200,97,.22),rgba(255,200,97,.06));border-color:rgba(255,200,97,.5);color:var(--halo)}
+.short span{font-size:11.5px;color:var(--muted);text-align:center;line-height:1.2}
+.short.set span{color:var(--paper)}
+.diarow{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--ink-3);
+  border-radius:16px;background:var(--ink-2);width:100%;text-align:left;font-size:14.5px;font-weight:600}
+.diarow .av{width:38px;height:38px;border-radius:50%;background:linear-gradient(150deg,#6a5ae0,#9d6ff0);
+  display:grid;place-items:center;flex:0 0 38px}
+.diarow .av svg{width:19px;height:19px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round}
+.diarow .ch{margin-left:auto;color:var(--muted)}
+#routeCard{border:1px solid var(--ink-3);border-radius:18px;padding:14px;background:var(--ink-2)}
+#routeCard:empty{display:none}
+.rline{display:flex;align-items:center;gap:10px;font-size:14.5px;margin-bottom:7px}
+.rline i{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+.rline em{font-style:normal;color:var(--muted);font-size:13px;flex:0 0 68px}
+.rline b{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rmeta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:11px 0}
+.rmeta .dur{background:var(--halo);color:#2a1c00;font-weight:700;font-size:14px;padding:7px 13px;border-radius:999px}
+.rmeta .km{color:var(--muted);font-size:13.5px}
+.rmeta .tag2{margin-left:auto;background:var(--ink-3);color:var(--paper);font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:999px}
+.spotlist{margin-top:13px;border-top:1px solid rgba(255,255,255,.08);padding-top:11px}
+.spotlist h5{margin:0 0 8px;font-size:12.5px;color:var(--muted);font-weight:600}
+.spotrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 0}
+.spotrow .g{width:9px;height:9px;border-radius:50%;background:#74e0b4;box-shadow:0 0 10px 2px rgba(116,224,180,.5);flex:0 0 9px}
+.spotrow .n{font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spotrow .x{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.rstats{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:11px}
+.rstats b{color:var(--paper);font-weight:600}
+.spotlist{margin-top:13px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}
+.sl-h{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.sl-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 0;
+  border-bottom:1px solid rgba(255,255,255,.055)}
+.sl-row:last-child{border-bottom:0}
+.sl-row i{width:9px;height:9px;border-radius:50%;flex:0 0 9px}
+.sl-row b{display:block;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sl-row span span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.sl-s{font-family:var(--font-d);font-weight:700;font-size:14px}
+.mapcard{position:relative;z-index:0;isolation:isolate;border-radius:20px;overflow:hidden;
+  border:1px solid var(--ink-3);height:48vh;min-height:300px;transition:height .3s ease}
+.mapcard.wide{height:66vh;min-height:420px}
+.mapacts{position:absolute;left:10px;right:10px;bottom:10px;z-index:500;display:flex;gap:8px}
+.mapacts button{flex:1;background:rgba(16,12,46,.92);border:1px solid var(--ink-3);border-radius:13px;
+  padding:12px 8px;font-size:13px;font-weight:600;backdrop-filter:blur(10px)}
+#walkBar{display:none;align-items:center;gap:11px;padding:12px 14px;border-radius:16px;
+  background:linear-gradient(90deg,rgba(116,224,180,.18),rgba(116,224,180,.05));border:1px solid rgba(116,224,180,.4)}
+#walkBar.on{display:flex}
+#walkBar .t{font-size:13.5px;font-weight:600}
+#walkBar .s{font-size:12px;color:var(--muted)}
+#walkBar button{margin-left:auto;background:var(--ink-2);border:1px solid var(--ink-3);border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:600}
+.slider{margin:16px 0 4px}
+.slider .top{display:flex;justify-content:space-between;align-items:baseline;font-size:14.5px;margin-bottom:8px}
+.slider .top b{color:var(--halo);font-family:var(--font-d);font-size:15px}
+.slider input[type=range]{width:100%;accent-color:var(--halo);height:26px;background:none;border:0;padding:0}
+.person{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);width:100%;text-align:left}
+.person .av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;color:#fff;flex:0 0 42px}
+.person .nm{font-size:15px;font-weight:600}
+.person .pick{margin-left:auto;color:var(--halo);font-size:13.5px;font-weight:700}
+
+/* --- alt menü --- */
+.tabs{display:flex;background:var(--ink);border-top:1px solid rgba(255,255,255,.07);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.tabs button{flex:1;padding:7px 2px 6px;border-radius:12px;color:var(--muted);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.tabs button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tabs button[aria-selected="true"]{color:var(--halo)}
+
+/* --- alt sayfa (sheet) --- */
+.sheet{position:fixed;inset:0;z-index:900;display:none}
+.sheet.on{display:block}
+.sheet .scrim{position:absolute;inset:0;background:rgba(6,4,20,.72)}
+.sheet .body{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:430px;
+  background:var(--ink);border-radius:var(--r-l) var(--r-l) 0 0;border-top:1px solid var(--ink-3);
+  max-height:88dvh;overflow-y:auto;padding:8px 18px calc(24px + env(safe-area-inset-bottom));
+  animation:up .26s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes up{from{transform:translate(-50%,26px);opacity:.4}to{transform:translate(-50%,0);opacity:1}}
+.grab{width:38px;height:4px;border-radius:99px;background:#3a2f70;margin:6px auto 14px}
+.sheet h2{font-family:var(--font-d);font-size:22px;margin:2px 0 4px;letter-spacing:-.02em}
+.sheet h3{font-family:var(--font-d);font-size:16px;margin:22px 0 8px}
+.review{border-left:2px solid var(--ink-3);padding:2px 0 2px 12px;margin-bottom:14px}
+.review .who{font-size:12.5px;color:var(--muted);margin-bottom:3px}
+.review p{margin:5px 0 0;font-size:14px}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:96px;z-index:1000;max-width:360px;width:calc(100% - 40px);
+  background:var(--ink-2);border:1px solid var(--halo);border-radius:14px;padding:12px 15px;font-size:13.5px;
+  box-shadow:0 14px 40px rgba(0,0,0,.5);animation:up .24s ease
+}
+.toast b{display:block;font-family:var(--font-d);font-size:15px;margin-bottom:2px}
+.note{font-size:12.5px;color:var(--muted);line-height:1.55;background:var(--ink-2);border:1px solid var(--ink-3);border-radius:12px;padding:11px 13px}
+.brand{display:flex;align-items:center;gap:14px;margin-top:24px}
+.brand-slot{display:flex;align-items:center;line-height:0}
+.brand-slot svg{width:78px;height:78px;border-radius:18px}
+.brand-slot img{height:78px;border-radius:18px;width:auto;max-width:220px;object-fit:contain}
+.brand-slot.sm svg{width:30px;height:30px;border-radius:8px}
+.brand-slot.sm img{height:30px;max-width:110px;border-radius:8px}
+.topbar .brand-slot{margin-right:2px}
+hr.sep{border:0;border-top:1px solid rgba(255,255,255,.07);margin:20px 0}
+.leaflet-tooltip{background:#191243;border:1px solid #241a5c;color:#efeaff;font-size:12px;box-shadow:0 8px 22px rgba(0,0,0,.45);border-radius:8px}
+.leaflet-tooltip-top::before{border-top-color:#241a5c}
+.leaflet-control-attribution{background:rgba(16,12,46,.8)!important;color:#8f86c4!important;font-size:10px}
+.leaflet-control-attribution a{color:#b6adde!important}
+.leaflet-bar a{background:#191243;color:#efeaff;border-color:#241a5c}
+.leaflet-bar a:hover{background:#241a5c;color:#fff}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="dianaTile" x1="0" y1="1" x2="1" y2="0">
+    <stop offset="0" stop-color="#3f74e8"/><stop offset=".55" stop-color="#6a5ae0"/><stop offset="1" stop-color="#9d6ff0"/>
+  </linearGradient>
+  <symbol id="dianaMark" viewBox="0 0 64 64">
+    <rect width="64" height="64" rx="15" fill="url(#dianaTile)"/>
+    <path d="M32 6.5c-9.6 0-17.4 7.7-17.4 17.2 0 6.2 4.2 14.5 8 20.6 2.7 4.3 5.4 7.9 6.6 9.4a1 1 0 0 0 1.6 0c1.2-1.5 3.9-5.1 6.6-9.4 3.8-6.1 8-14.4 8-20.6C49.4 14.2 41.6 6.5 32 6.5z" fill="#111436"/>
+    <g fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M28.9 19.6C26.7 15.7 24.9 11.2 24.6 6.3"/><path d="M27.4 16.4c-2 .2-3.8-.4-5.4-1.7"/>
+      <path d="M25.9 12.7c-1.7-.1-3.1-.9-4.3-2.3"/><path d="M24.9 9.2c-1-1.3-1.4-2.8-1.3-4.5"/>
+      <path d="M35.1 19.6C37.3 15.7 39.1 11.2 39.4 6.3"/><path d="M36.6 16.4c2 .2 3.8-.4 5.4-1.7"/>
+      <path d="M38.1 12.7c1.7-.1 3.1-.9 4.3-2.3"/><path d="M39.1 9.2c1-1.3 1.4-2.8 1.3-4.5"/>
+    </g>
+    <g fill="#fff">
+      <ellipse cx="24.9" cy="22.4" rx="3.5" ry="2" transform="rotate(-22 24.9 22.4)"/>
+      <ellipse cx="39.1" cy="22.4" rx="3.5" ry="2" transform="rotate(22 39.1 22.4)"/>
+      <path d="M32 17.2c3.4 0 5.9 2.7 5.9 6.3 0 2.3-.4 4.6-1.3 6.7-.9 2.2-1.9 3.9-2.9 5a2.3 2.3 0 0 1-3.4 0c-1-1.1-2-2.8-2.9-5-.9-2.1-1.3-4.4-1.3-6.7 0-3.6 2.5-6.3 5.9-6.3z"/>
+      <path d="M32 38.4l1.5 4.3 4.3 1.5-4.3 1.5L32 50l-1.5-4.3-4.3-1.5 4.3-1.5z"/>
+    </g>
+  </symbol>
+</defs></svg>
+<div class="shell">
+
+  <!-- ================= GİRİŞ EKRANI ================= -->
+  <section id="auth" aria-label="Giriş">
+    <div class="lampfield" id="lampfield" aria-hidden="true"></div>
+    <div class="auth-inner">
+      <div class="brand"><span class="brand-slot" data-brand></span></div>
+      <h1 class="wordmark">DIANA<span>Karanlıkta değil, aydınlık rotada.</span></h1>
+      <p class="auth-lede">Şehrin iyi aydınlatılmış, kalabalık ve güvenli hissettiren yerlerini birlikte işaretliyoruz.</p>
+
+      <div class="segmented" role="tablist">
+        <button role="tab" id="tab-login" aria-selected="true" onclick="A.mode('login')">Giriş yap</button>
+        <button role="tab" id="tab-reg" aria-selected="false" onclick="A.mode('reg')">Kayıt ol</button>
+      </div>
+
+      <form id="authForm" onsubmit="A.submit(event)" autocomplete="on">
+        <label class="field" id="fName" hidden><span>Ad soyad</span>
+          <input type="text" id="iName" placeholder="Deniz Yılmaz" autocomplete="name"></label>
+        <label class="field"><span>E-posta</span>
+          <input type="email" id="iMail" placeholder="ornek@posta.com" autocomplete="email" required oninput="A.edu()"></label>
+        <p class="edu-hint" id="eduHint" hidden>Öğrenci adresi tanındı — öğrenci fiyatı sana açık.</p>
+        <label class="field"><span>Şifre</span>
+          <input type="password" id="iPass" placeholder="En az 6 karakter" autocomplete="current-password" required minlength="6"></label>
+        <div class="row-between" style="margin:4px 0 16px">
+          <label class="check"><input type="checkbox" id="iRemember" checked> Beni hatırla</label>
+          <button type="button" class="btn-line" onclick="A.forgot()">Şifremi unuttum</button>
+        </div>
+        <p class="err" id="authErr" role="alert"></p>
+        <div id="authList"></div>
+        <button class="btn btn-primary" id="authBtn" type="submit">Giriş yap</button>
+      </form>
+
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="P.open()">Premium paketleri gör</button>
+      <button class="btn-line" style="margin:6px auto 0" onclick="A.guest()">Önce keşfet, sonra karar ver</button>
+
+      <p class="auth-foot">Hesabın bu cihazda saklanır. Demo sürümde ödeme alınmaz.</p>
+    </div>
+  </section>
+
+  <!-- ================= UYGULAMA ================= -->
+  <main id="app">
+    <header class="topbar">
+      <span class="brand-slot sm" data-brand></span>
+      <div>
+        <h1 id="topTitle">Aydınlık rota</h1>
+        <div class="sub" id="topSub">Çevrendeki yerler</div>
+      </div>
+      <button class="lamp-badge" onclick="U.go('badges')" title="Puanın"><b id="ptsTop">0</b> ışık</button>
+    </header>
+
+    <!-- HARİTA -->
+    <section class="view" id="view-map">
+      <div class="mapscreen">
+
+        <div class="gobox">
+          <div class="gorow">
+            <i class="gd" style="background:#74e0b4"></i>
+            <input id="from" type="text" placeholder="Nereden — konumunu yaz" autocomplete="off"
+                   oninput="Nav.type('f',this.value)" onkeydown="Nav.enter('f',event)">
+            <button class="gobtn" onclick="M.locate()" title="Konumumu kullan">◎</button>
+          </div>
+          <div class="gores" id="fromRes"></div>
+          <div class="goline"></div>
+          <div class="gorow">
+            <i class="gd" style="background:#9d6ff0"></i>
+            <input id="dest" type="text" placeholder="Nereye gidiyorsun?" autocomplete="off"
+                   oninput="Nav.type('t',this.value)" onkeydown="Nav.enter('t',event)">
+            <button class="gobtn" onclick="Nav.swap()" title="Yerlerini değiştir">⇅</button>
+          </div>
+          <div class="gores" id="destRes"></div>
+          <div class="modes" id="modes"></div>
+          <div class="pickrow" style="margin:10px 2px 2px">
+            <button class="chip" onclick="Nav.focusFrom()">Nerede olduğumu yazayım</button>
+            <button class="chip" onclick="Nav.pick('f')">Başlangıcı haritadan seç</button>
+            <button class="chip" onclick="Nav.pick('t')">Varışı haritadan seç</button>
+          </div>
+          <div id="geoStatus"></div>
+        </div>
+
+        <div class="shorts" id="shorts"></div>
+
+        <div id="walkBar"></div>
+        <div id="routeCard"></div>
+
+        <div class="mapcard">
+          <div id="map"></div>
+          <div class="map-tools" id="mapChips"></div>
+          <div id="pickHint">Haritada bir noktaya dokun</div>
+          <div class="legend">
+            <i style="background:#74e0b4"></i>4.0 ve üstü<br>
+            <i style="background:#ffc861"></i>3.0 – 3.9<br>
+            <i style="background:#ff6b8a"></i>3.0 altı
+          </div>
+          <button class="map-fab" onclick="M.locate()" title="Konumuma dön">◎</button>
+          <button class="map-fab" id="layerBtn" style="bottom:112px" onclick="M.cycle()" title="Harita katmanı">◫</button>
+          <div id="navPanel"></div>
+          <div class="mapacts">
+            <button onclick="W.open()">Benimle yürü</button>
+            <button onclick="St.open()">Sokağı değerlendir</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- YERLER -->
+    <section class="view" id="view-list">
+      <div class="searchbar">
+        <input type="text" id="q" placeholder="Yer, sokak veya tür ara" oninput="Lst.render()">
+      </div>
+      <div class="filters" id="listChips"></div>
+      <div id="listBody"></div>
+    </section>
+
+    <!-- ROZETLER -->
+    <section class="view" id="view-badges">
+      <div class="pad">
+        <div class="level-card">
+          <div style="color:#cfc7f5;font-size:13px">Seviyen</div>
+          <div class="lv" id="lvName">Kıvılcım</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px" id="lvNext"></div>
+          <div class="bar"><i id="lvBar" style="width:0%"></i></div>
+        </div>
+        <h3 style="font-family:var(--font-d);font-size:17px;margin:24px 0 4px">Rozetlerin</h3>
+        <p style="color:var(--muted);font-size:13px;margin:0 0 14px" id="badgeCount"></p>
+        <div class="badges" id="badgeGrid"></div>
+        <h3 style="font-family:var(--font-d);font-size:17px;margin:26px 0 8px">Işık nasıl kazanılır</h3>
+        <div class="note">
+          Değerlendirme yazmak 25, dört ölçütü birden doldurmak 10, bir yeri paylaşmak 5 ışık kazandırır.
+          Her yeni rozet 50 ışık ekler. Işıklar seviyeni yükseltir; seviye, değerlendirmenin haritada ne kadar
+          ağırlık taşıdığını belirler.
+        </div>
+      </div>
+    </section>
+
+    <!-- KOMÜNİTE -->
+    <section class="view" id="view-com">
+      <div class="pad" id="comBody"></div>
+    </section>
+
+    <!-- DIA -->
+    <section class="view" id="view-dia">
+      <div class="chat" id="chat"></div>
+      <div class="quick" id="quick"></div>
+      <form class="composer" onsubmit="D.send(event)">
+        <input type="text" id="diaIn" placeholder="Dia'ya sor…" autocomplete="off">
+        <button type="submit" aria-label="Gönder">↑</button>
+      </form>
+    </section>
+
+    <!-- PROFİL -->
+    <section class="view" id="view-me">
+      <div class="pad" id="meBody"></div>
+    </section>
+
+    <div id="adbar" hidden></div>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="map" aria-selected="true" onclick="U.go('map')">
+        <svg viewBox="0 0 24 24"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Z"/><path d="M9 3v15M15 6v15"/></svg>Harita</button>
+      <button role="tab" data-tab="list" aria-selected="false" onclick="U.go('list')">
+        <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>Yerler</button>
+      <button role="tab" data-tab="badges" aria-selected="false" onclick="U.go('badges')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="m8.5 14-1.5 7 5-3 5 3-1.5-7"/></svg>Rozetler</button>
+      <button role="tab" data-tab="com" aria-selected="false" onclick="U.go('com')">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="7" r="2.4"/><path d="M15.5 13.7A4.6 4.6 0 0 1 21 18"/></svg>Komünite</button>
+      <button role="tab" data-tab="dia" aria-selected="false" onclick="U.go('dia')">
+        <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z"/><path d="M9 11h.01M13 11h.01"/></svg>Dia</button>
+      <button role="tab" data-tab="me" aria-selected="false" onclick="U.go('me')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>Profil</button>
+    </nav>
+  </main>
+
+  <!-- ================= SHEETS ================= -->
+  <div class="sheet" id="sheet"><div class="scrim" onclick="S.close()"></div>
+    <div class="body" id="sheetBody" role="dialog" aria-modal="true"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ============================================================
+   DIANA — tek dosyalık uygulama
+   ============================================================ */
+
+/* ---------- depolama (localStorage yoksa belleğe düşer) ---------- */
+const store = (() => {
+  let mem = {}, ok = false;
+  try { localStorage.setItem('__d', '1'); localStorage.removeItem('__d'); ok = true; } catch (e) { ok = false; }
+  return {
+    get(k){ try { return ok ? localStorage.getItem(k) : (k in mem ? mem[k] : null); } catch(e){ return mem[k] ?? null; } },
+    set(k,v){ try { ok ? localStorage.setItem(k,v) : (mem[k]=v); } catch(e){ mem[k]=v; } },
+    del(k){ try { ok ? localStorage.removeItem(k) : delete mem[k]; } catch(e){ delete mem[k]; } },
+    persistent: ok
+  };
+})();
+const J = { get(k,d){ try { return JSON.parse(store.get(k)) ?? d; } catch(e){ return d; } }, set(k,v){ store.set(k, JSON.stringify(v)); } };
+
+/* ---------- sunucu API katmanı ----------
+   Uygulama aynı origin'deki Netlify Functions'a konuşur (/api/...).
+   Sunucuya erişilemezse (yerelde dosyadan açma, hosting yok) çağıranlar
+   cihaz-yerel yedeğe düşer. Kimlik JWT ile taşınır. */
+const API = {
+  base: '',
+  token(){ return store.get('diana.token'); },
+  setToken(t){ t ? store.set('diana.token', t) : store.del('diana.token'); },
+  reachable: null,                       // null=bilinmiyor, true/false=algılandı
+  async call(path, { method = 'GET', body = null, auth = true } = {}){
+    const headers = {};
+    if(body) headers['Content-Type'] = 'application/json';
+    const tok = API.token();
+    if(auth && tok) headers['Authorization'] = 'Bearer ' + tok;
+    let r;
+    try {
+      r = await fetch(API.base + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    } catch(netErr){
+      API.reachable = false;
+      const e = new Error('Sunucuya ulaşılamadı.'); e.offline = true; throw e;
+    }
+    if(r.status === 404){ API.reachable = false; const e = new Error('Uç nokta yok.'); e.offline = true; throw e; }
+    API.reachable = true;
+    let data = null; try { data = await r.json(); } catch(e){}
+    if(!r.ok){ const e = new Error((data && data.error) || ('İstek başarısız (' + r.status + ')')); e.status = r.status; e.data = data; throw e; }
+    return data;
+  }
+};
+
+/* ---------- yapılandırma ----------
+   MapTiler'dan ücretsiz anahtar alıp buraya yazarsan harita en güvenilir katmanı kullanır.
+   Boş bırakılırsa CARTO → OpenStreetMap → Esri sırasıyla denenir. */
+const MAP_KEY = '';
+
+/* ---------- durum ---------- */
+const state = {
+  user: null,
+  center: [41.0082, 28.9784],      // konum alınamazsa geçici merkez
+  located: false, manualStart: false,
+  places: [],
+  filter: 'hepsi',
+  map: null, layers: {}, meMarker: null, walk: null, mode: 'foot', nav: null, routeSpots: null,
+  chat: []
+};
+
+const ICONS = {home:'<path d="M4 11.5 12 4l8 7.5"/><path d="M6.5 10.5V20h11v-9.5"/><path d="M10.5 20v-5h3v5"/>',work:'<path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="M7 11.8V16c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-4.2"/>',star:'<path d="M12 4.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/>',plus:'<path d="M12 6v12M6 12h12"/>'};
+const CATS = ['hepsi','kafe','eczane','ulaşım','market','park','geçit','otopark','güvenli nokta','etkinlik'];
+
+/* ---------- örnek yerler (merkeze göre konumlanır) ---------- */
+const SEED = [
+  {id:'p1', h:[8,25], name:'Kandil Kahve', cat:'kafe', dLat:.0021, dLng:.0016, note:'Cam cephe, sokağa taşan ışık',
+   r:[{u:'Elif',v:[5,5,4,5],c:'Gece 1’e kadar açık, kapının önü ışıl ışıl. Tek başına oturmak rahat.',d:6},
+      {u:'Zeynep',v:[5,4,4,4],c:'Personel taksiyi kapıya çağırdı, beklerken içeride durabildim.',d:19}]},
+  {id:'p2', h:'24', name:'Nöbetçi Eczane – Meydan', cat:'eczane', dLat:-.0012, dLng:.0027, note:'7/24 nöbet',
+   r:[{u:'Merve',v:[5,5,3,5],c:'Gece nöbetinde bile kepenk yarı açık, içeriden görüyorlar.',d:3}]},
+  {id:'p3', h:[6,25], name:'Meydan Durağı', cat:'ulaşım', dLat:.0006, dLng:-.0019, note:'Metro çıkışı, taksi durağı yanı',
+   r:[{u:'Ayşe',v:[4,3,5,4],c:'Kalabalık akıyor, bekleme alanı aydınlık. Arka çıkış tarafı loş.',d:2},
+      {u:'Sude',v:[4,4,4,3],c:'Son sefer sonrası boşalıyor, 23’ten sonra ön kapıyı kullanın.',d:11}]},
+  {id:'p4', h:[8,24], name:'Papatya Market', cat:'market', dLat:.0034, dLng:-.0008, note:'00:00’a kadar açık',
+   r:[{u:'Nur',v:[4,4,3,4],c:'Kasadaki abla “çıkarken bekleyeyim mi” diye sordu, iyi hissettirdi.',d:8}]},
+  {id:'p5', h:'24', name:'Park Kuzey Girişi', cat:'park', dLat:-.0026, dLng:-.0014, note:'Yeni LED aydınlatma',
+   r:[{u:'Ceren',v:[4,3,4,4],c:'Ana yol boyunca lambalar çalışıyor, iç patikalar hâlâ karanlık.',d:14}]},
+  {id:'p6', h:'24', name:'Kütüphane Yan Geçidi', cat:'geçit', dLat:.0009, dLng:.0038, note:'Kısa yol ama dar',
+   r:[{u:'İpek',v:[1,2,1,2],c:'İki lamba da kırık, sonu görünmüyor. Uzun yoldan dolaşın.',d:5},
+      {u:'Buse',v:[2,2,2,2],c:'Gündüz sorun yok, hava karardıktan sonra tercih etmiyorum.',d:21}]},
+  {id:'p7', h:'24', name:'Kapalı Otopark B2', cat:'otopark', dLat:-.0033, dLng:.0021, note:'Asansör katı',
+   r:[{u:'Gamze',v:[2,3,1,2],c:'Asansör holü aydınlık, park katları çok loş. Görevli çağırmak mümkün.',d:9}]},
+  {id:'p8', h:'24', name:'Güvenli Nokta – Karakol', cat:'güvenli nokta', dLat:.0044, dLng:.0031, note:'24 saat açık',
+   r:[{u:'Diana ekibi',v:[5,5,4,5],c:'Doğrulanmış güvenli nokta. Kapı önü kamerayla izleniyor.',d:30}]},
+  {id:'p9', h:[10,24], name:'Sahne Kültür Merkezi', cat:'etkinlik', dLat:-.0007, dLng:.0044, note:'Konser çıkışı yoğun',
+   r:[{u:'Selin',v:[4,5,5,3],c:'Etkinlik çıkışında görevliler durakla arayı kordonla ayırıyor.',d:4}]},
+  {id:'p10', h:[5,20], name:'Mor Fırın', cat:'kafe', dLat:.0016, dLng:-.0036, note:'Sabah 5’te açılıyor',
+   r:[{u:'Hatice',v:[4,5,3,4],c:'Erken saatte açık tek yer, vardiya dönüşü sığınmak için birebir.',d:16}]}
+];
+
+/* ---------- rozetler ---------- */
+const BADGES = [
+  {id:'ilk_isik',    g:'1',  n:'İlk Işık',      d:'İlk değerlendirmeni yaz'},
+  {id:'fenerci',     g:'5',  n:'Fenerci',       d:'5 yer değerlendir'},
+  {id:'gece_bekcisi',g:'✦',  n:'Gece Bekçisi',  d:'22.00–05.00 arası katkı ver'},
+  {id:'kasif',       g:'K',  n:'Kaşif',         d:'3 farklı türde yer değerlendir'},
+  {id:'isikci',      g:'∴',  n:'Işıkçı',        d:'250 ışık topla'},
+  {id:'yol_arkadasi',g:'⇢',  n:'Yol Arkadaşı',  d:'Bir yeri arkadaşınla paylaş'},
+  {id:'dia_dostu',   g:'D',  n:'Dia Dostu',     d:'Dia ile ilk sohbetini yap'},
+  {id:'muse',        g:'M',  n:'Muse Üyesi',    d:'Premium’u etkinleştir'}
+];
+const LEVELS = [{p:0,n:'Kıvılcım'},{p:100,n:'Fener'},{p:300,n:'Far'},{p:700,n:'Deniz Feneri'}];
+
+/* ---------- paketler ---------- */
+const PLANS = {
+  student:  {n:'Öğrenci',  who:'.edu uzantılı adresle',  m:59.99,  y:549.99},
+  standard: {n:'Standart', who:'Herkese açık',           m:129.99, y:999.99},
+  daypass:  {n:'Etkinlik günü', who:'Tek gün, tek etkinlik', once:29.99}
+};
+
+/* ---------- yardımcılar ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"'`]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
+const normMail = m => String(m || '').trim().toLowerCase();
+const avatarColor = s => { let h = 0; for(const c of String(s||'?')) h = (h*31 + c.charCodeAt(0)) % 360; return `hsl(${h} 52% 46%)`; };
+const initials = s => String(s||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase() || '?';
+function timeAgo(iso){
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime())/1000);
+  if(s < 60) return 'az önce';
+  const m = s/60; if(m < 60) return Math.floor(m) + ' dk önce';
+  const h = m/60; if(h < 24) return Math.floor(h) + ' sa önce';
+  const d = h/24; if(d < 30) return Math.floor(d) + ' gün önce';
+  return Math.floor(d/30) + ' ay önce';
+}
+function debounce(fn, ms){ let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+/* yerel mod şifre karması (sunucuya bağlanılamadığında) */
+function randSalt(){ return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+async function hashLocal(pass, salt){
+  const data = new TextEncoder().encode(salt + '::' + pass);
+  if(crypto && crypto.subtle){
+    const buf = await crypto.subtle.digest('SHA-256', data);
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+  // güvenli bağlam yoksa (ör. file://) basit yedek karma
+  let h = 0; for(const b of data) h = (Math.imul(h,31) + b) | 0;
+  return 'x' + (h >>> 0).toString(16);
+}
+const money = n => n.toFixed(2).replace('.', ',') + ' ₺';
+const UA = navigator.userAgent;
+const isIOS = /iphone|ipad|ipod/i.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(UA);
+const isEdu = m => /@[^@]*\.edu(\.[a-z]{2,3})?$/i.test(m || '');
+const avg = a => a.reduce((x,y)=>x+y,0) / a.length;
+const score = p => p.r.length ? avg(p.r.map(x => avg(x.v))) : 0;
+const color = s => s >= 4 ? '#74e0b4' : s >= 3 ? '#ffc861' : '#ff6b8a';
+const isOpen = p => {
+  if(!p.h) return true;
+  if(p.h === '24') return true;
+  const c = new Date().getHours(), [a,b] = p.h;
+  return b > 24 ? (c >= a || c < b - 24) : (c >= a && c < b);
+};
+const openTxt = p => !p.h ? 'açık' : p.h === '24' ? '24 saat açık'
+  : `${String(p.h[1] % 24).padStart(2,'0')}.00’a kadar`;
+const openText = p => {
+  if(!p.h || p.h === '24') return '24 saat açık';
+  const b = p.h[1] > 24 ? p.h[1] - 24 : p.h[1];
+  return `${String(b).padStart(2,'0')}.00’a kadar açık`;
+};
+const ago = d => d === 0 ? 'bugün' : d === 1 ? 'dün' : d < 30 ? d + ' gün önce' : Math.round(d/30) + ' ay önce';
+const lamps = s => `<span class="lamps">${[1,2,3,4,5].map(i=>`<i class="${i<=Math.round(s)?'on':''}"></i>`).join('')}</span>`;
+const dist = (a,b) => { const R=6371e3, t=x=>x*Math.PI/180;
+  const dφ=t(b[0]-a[0]), dλ=t(b[1]-a[1]), φ1=t(a[0]), φ2=t(b[0]);
+  const h=Math.sin(dφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h)); };
+const walk = m => m < 950 ? Math.max(1, Math.round(m/78)) + ' dk yürüme' : (m/1000).toFixed(1) + ' km';
+
+function toast(title, text){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<b>${esc(title)}</b>${esc(text||'')}`;
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),320); }, 2900);
+}
+
+/* ---------- kullanıcı deposu (cihaz-yerel yedek) ----------
+   Sunucu erişilebilirken hesaplar sunucudadır; bu depo yalnızca sunucuya
+   ulaşılamadığında (dosyadan açma, hosting yok) devreye girer. Anahtar her
+   zaman normalize edilmiş e-postadır; şifre düz değil, tuzlanmış karma tutulur. */
+const DB = {
+  users(){ return J.get('diana.users', {}); },
+  save(u){ const all = DB.users(); all[normMail(u.email)] = u; J.set('diana.users', all);
+           if(state.user && normMail(state.user.email) === normMail(u.email)) state.user = u; },
+  find(mail){ return DB.users()[normMail(mail)] || null; }
+};
+function persistSession(){ if(state.user && state.user.remember) J.set('diana.session', normMail(state.user.email)); }
+/* Profil durumu (puan, rozet, değerlendirme) aynı cihazda kalıcı olsun diye
+   e-postaya göre önbelleğe yazılır; yerel hesaplar ayrıca DB'ye de yazılır. */
+function saveUser(){
+  if(!state.user || state.user.guest) return;
+  const cache = J.get('diana.cache', {});
+  cache[normMail(state.user.email)] = state.user;
+  J.set('diana.cache', cache);
+  if(state.user.local) DB.save(state.user);
+  else pushProfile();                    // sunucu kullanıcısı → profili buluta yaz (debounce)
+}
+/* Puan/rozet/tercih/paket durumunu sunucuya (cihazlar arası) yazar. */
+const pushProfile = debounce(async () => {
+  const u = state.user;
+  if(!u || u.guest || u.local || API.reachable === false) return;
+  try {
+    await API.call('/api/profile', { method:'PUT', body:{
+      points: u.points || 0, badges: u.badges || [], reviews: u.reviews || [],
+      prefs: u.prefs || {}, plan: u.plan || null } });
+  } catch(e){ /* sessiz — sonraki değişiklikte yeniden dener */ }
+}, 900);
+
+/* ---------- kimlik doğrulama (sunucu + yerel yedek) ---------- */
+const Auth = {
+  /* sunucu kullanıcısını uygulama biçimine getir, cihaz önbelleğiyle birleştir */
+  hydrate(u, rem, local){
+    u.remember = !!rem;
+    u.local = !!local;
+    // Sunucu kullanıcısında profilin kaynağı sunucudur (cihazlar arası tutarlılık).
+    // Yerel modda ise cihaz önbelleği profili taşır.
+    if(local){
+      const cache = (J.get('diana.cache', {}))[normMail(u.email)];
+      if(cache) ['points','badges','reviews','prefs','plan'].forEach(k => { if(cache[k] != null) u[k] = cache[k]; });
+    }
+    u.email = normMail(u.email);
+    u.points = u.points || 0; u.badges = u.badges || []; u.reviews = u.reviews || []; u.prefs = u.prefs || {};
+    return u;
+  },
+  async register({ name, mail, pass, rem }){
+    const d = await API.call('/api/auth/register', { auth:false, method:'POST', body:{ name, email:mail, password:pass } });
+    API.setToken(d.token);
+    return Auth.hydrate(d.user, rem, false);
+  },
+  async login({ mail, pass, rem }){
+    const d = await API.call('/api/auth/login', { auth:false, method:'POST', body:{ email:mail, password:pass } });
+    API.setToken(d.token);
+    return Auth.hydrate(d.user, rem, false);
+  },
+  async me(){
+    if(!API.token()) return null;
+    try { const d = await API.call('/api/auth/me'); return Auth.hydrate(d.user, true, false); }
+    catch(e){ if(e.status === 401) API.setToken(null); return null; }
+  },
+  /* ---- sunucu yokken cihaz-yerel yedek ---- */
+  async registerLocal({ name, mail, pass, rem }){
+    if(DB.find(mail)) throw new Error('Bu adres bu cihazda kayıtlı. Giriş yap sekmesine geç.');
+    const salt = randSalt();
+    const u = { email: normMail(mail), name, salt, hash: await hashLocal(pass, salt),
+                points:0, badges:[], reviews:[], plan:null, prefs:{}, remember:rem, edu:isEdu(mail), local:true };
+    DB.save(u);
+    return Auth.hydrate(u, rem, true);
+  },
+  async loginLocal({ mail, pass, rem }){
+    const u = DB.find(mail);
+    if(!u) throw new Error('Sunucuya ulaşılamadı ve bu cihazda bu adresle hesap yok.');
+    const ok = u.hash ? (await hashLocal(pass, u.salt) === u.hash) : (u.pass === pass); // eski düz şifreyle uyum
+    if(!ok) throw new Error('E-posta veya şifre hatalı.');
+    if(!u.hash){ u.salt = randSalt(); u.hash = await hashLocal(pass, u.salt); delete u.pass; } // düz şifreyi karmaya yükselt
+    u.remember = rem; DB.save(u);
+    return Auth.hydrate(u, rem, true);
+  },
+  logout(){ API.setToken(null); store.del('diana.session'); }
+};
+
+/* ---------- puan & rozet ---------- */
+function addPoints(n, why){
+  if(!state.user) return;
+  state.user.points = (state.user.points||0) + n;
+  saveUser(); paintPoints();
+  if(why) toast('+' + n + ' ışık', why);
+}
+function grant(id){
+  if(!state.user) return false;
+  state.user.badges = state.user.badges || [];
+  if(state.user.badges.includes(id)) return false;
+  state.user.badges.push(id);
+  state.user.points = (state.user.points||0) + 50;
+  saveUser(); paintPoints(); B.render();
+  const b = BADGES.find(x=>x.id===id);
+  toast('Yeni rozet: ' + b.n, b.d + ' • +50 ışık');
+  return true;
+}
+function checkBadges(){
+  if(!state.user) return;
+  const rv = state.user.reviews || [];
+  if(rv.length >= 1) grant('ilk_isik');
+  if(rv.length >= 5) grant('fenerci');
+  if(new Set(rv.map(r=>r.cat)).size >= 3) grant('kasif');
+  if(rv.some(r => r.h >= 22 || r.h < 5)) grant('gece_bekcisi');
+  if((state.user.points||0) >= 250) grant('isikci');
+}
+function levelOf(p){
+  let cur = LEVELS[0], next = null;
+  LEVELS.forEach((l,i)=>{ if(p >= l.p){ cur = l; next = LEVELS[i+1] || null; } });
+  return {cur, next};
+}
+function paintPoints(){ $('#ptsTop').textContent = state.user ? (state.user.points||0) : 0; }
+function isPremium(){
+  const p = state.user && state.user.plan;
+  return !!(p && p.until && Date.now() < p.until);
+}
+
+/* ============================================================
+   GİRİŞ
+   ============================================================ */
+const A = {
+  m: 'login',
+  mode(m){
+    A.m = m;
+    $('#tab-login').setAttribute('aria-selected', m==='login');
+    $('#tab-reg').setAttribute('aria-selected', m==='reg');
+    $('#fName').hidden = m !== 'reg';
+    $('#authBtn').textContent = m === 'login' ? 'Giriş yap' : 'Hesabı oluştur';
+    $('#iPass').setAttribute('autocomplete', m==='login' ? 'current-password' : 'new-password');
+    $('#authErr').textContent = '';
+  },
+  edu(){ $('#eduHint').hidden = !isEdu($('#iMail').value); },
+  /* bu cihazda kayıtlı adresleri göster — “giriş yapamıyorum” vakalarının çoğu yazım hatası */
+  list(){
+    const el = $('#authList'); if(!el) return;
+    const mails = Object.keys(DB.users());
+    el.textContent = '';
+    if(!mails.length) return;
+    const cap = document.createElement('div');
+    cap.style.cssText = 'font-size:12.5px;color:var(--muted);margin:10px 0 6px';
+    cap.textContent = 'Bu cihazda kayıtlı hesaplar';
+    el.appendChild(cap);
+    // Güvenlik: e-posta metni satır içi onclick'e enterpolasyon YAPILMADAN,
+    // olay dinleyicisiyle bağlanır (JS-string bağlamı enjeksiyonu kapatılır).
+    mails.forEach(m => {
+      const b = document.createElement('button');
+      b.className = 'chip'; b.style.margin = '0 6px 6px 0';
+      b.textContent = m;                       // textContent → otomatik güvenli
+      b.addEventListener('click', () => A.fill(m));
+      el.appendChild(b);
+    });
+  },
+  fill(m){ $('#iMail').value = m; $('#iPass').focus(); $('#authErr').textContent = ''; A.edu(); },
+  forgot(){
+    S.raw(`<h2>Şifre sıfırlama</h2>
+      <p style="color:var(--muted)">Hesabın sunucuda güvenle tutuluyor. Bu demo sürümde otomatik
+      sıfırlama e-postası gönderilmiyor; şifreni hatırlamıyorsan destek ekibiyle iletişime geçebilir
+      ya da (sunucuya bağlı değilsen) aynı adresle bu cihazda yeniden kayıt olabilirsin.</p>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="S.close()">Tamam</button>`);
+  },
+  guest(){
+    state.user = {email:'misafir', name:'Misafir', guest:true, points:0, badges:[], reviews:[], plan:null, prefs:{}, remember:false};
+    A.enter();
+  },
+  async submit(e){
+    e.preventDefault();
+    const mail = normMail($('#iMail').value),
+          pass = $('#iPass').value,
+          name = $('#iName').value.trim(),
+          rem  = $('#iRemember').checked,
+          err  = $('#authErr'),
+          btn  = $('#authBtn');
+    err.textContent = '';
+    if(A.m === 'reg' && !name){ err.textContent = 'Ad soyad alanını doldur.'; return; }
+    if(!mail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ err.textContent = 'Geçerli bir e-posta gir.'; return; }
+    if((pass || '').length < 6){ err.textContent = 'Şifre en az 6 karakter olmalı.'; return; }
+
+    const label = btn.textContent; btn.disabled = true; btn.textContent = 'Bekle…';
+    try {
+      let u;
+      try {
+        // 1) Önce gerçek sunucu — hesap cihazlar arası çalışır
+        u = A.m === 'reg' ? await Auth.register({name, mail, pass, rem})
+                          : await Auth.login({mail, pass, rem});
+      } catch(ex){
+        if(ex && ex.offline){
+          // 2) Sunucuya ulaşılamadı → cihaz-yerel yedek
+          u = A.m === 'reg' ? await Auth.registerLocal({name, mail, pass, rem})
+                            : await Auth.loginLocal({mail, pass, rem});
+        } else {
+          throw ex;   // 401/409 gibi gerçek kimlik hataları yukarı çıkar
+        }
+      }
+      state.user = u;
+      if(rem) persistSession(); else store.del('diana.session');
+      A.enter();
+    } catch(ex){
+      console.error(ex);
+      err.textContent = (ex && ex.message) || 'Giriş yapılamadı.';
+      A.list();
+    } finally {
+      btn.disabled = false; btn.textContent = label;
+    }
+  },
+  enter(){
+    $('#auth').style.display = 'none';
+    $('#app').classList.add('on');
+    paintPoints(); B.render(); Me.render(); Ad.start(); Fav.render(); W.bar();
+    U.go('map');            // önce görünür yap, sonra haritayı kur
+    M.init(); Lst.render(); D.boot(); Nav.sync(); Nav.modes(); Com.boot();
+  }
+};
+
+/* ============================================================
+   PAKETLER
+   ============================================================ */
+const P = {
+  cycle: 'm',
+  open(){ S.raw(P.html()); },
+  setCycle(c){ P.cycle = c; $('#sheetBody').innerHTML = P.html(); },
+  html(){
+    const edu = isEdu(($('#iMail') && $('#iMail').value) || (state.user && state.user.email) || '');
+    const c = P.cycle, per = c === 'm' ? '/ay' : '/yıl peşin';
+    const p = state.user && state.user.plan;
+    const active = isPremium() ? `<div class="note" style="border-color:rgba(116,224,180,.4);color:var(--mint);margin-bottom:14px">
+        ${esc(p.label)} etkin — ${new Date(p.until).toLocaleString('tr-TR',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})} tarihine kadar.</div>` : '';
+    return `<h2>Premium</h2>
+      <p style="color:var(--muted);margin:0 0 6px">Reklamsız kullanım, gece rotası uyarıları ve Dia’ya sınırsız soru.</p>
+      ${active}
+      <div class="seg-yearly">
+        <button aria-selected="${c==='m'}" onclick="P.setCycle('m')">Aylık</button>
+        <button aria-selected="${c==='y'}" onclick="P.setCycle('y')">Yıllık peşin</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:6px 0 16px">${c==='y' ? 'Yıllık ödemede öğrencide 170 ₺, standartta 560 ₺ kalıyor cebinde.' : 'İstediğin ay iptal edebilirsin.'}</p>
+      <div class="plans">
+        <div class="plan ${edu?'hi':''}">
+          ${edu ? '<span class="tag mint">Adresin uygun</span>' : ''}
+          <h4>Öğrenci</h4><div class="who">.edu uzantılı adresle doğrulama</div>
+          <div class="price"><b>${money(c==='m'?PLANS.student.m:PLANS.student.y)}</b><small>${per}</small></div>
+          <ul><li>Tüm premium özellikler</li><li>Kampüs çevresi gece rotaları</li><li>Reklamsız</li></ul>
+          ${edu
+            ? `<button class="btn btn-primary" onclick="P.buy('student','${c}')">Öğrenci paketini başlat</button>`
+            : `<button class="btn btn-ghost" onclick="toast('Doğrulama gerekli','Öğrenci fiyatı için .edu adresiyle kayıt ol.')">.edu adresi gerekiyor</button>`}
+        </div>
+        <div class="plan ${edu?'':'hi'}">
+          ${edu ? '' : '<span class="tag">En çok seçilen</span>'}
+          <h4>Standart</h4><div class="who">Herkese açık</div>
+          <div class="price"><b>${money(c==='m'?PLANS.standard.m:PLANS.standard.y)}</b><small>${per}</small></div>
+          <ul><li>Reklamsız kullanım</li><li>Işık puanı geçmişi ve rota kaydı</li><li>Dia’ya sınırsız soru</li><li>Yakınına konum paylaşımı</li></ul>
+          <button class="btn btn-primary" onclick="P.buy('standard','${c}')">Standart paketi başlat</button>
+        </div>
+        <div class="plan">
+          <h4>Etkinlik günü</h4><div class="who">Konser, maç, festival — tek gün</div>
+          <div class="price"><b>${money(PLANS.daypass.once)}</b><small>tek seferlik</small></div>
+          <ul><li>Yalnızca katılacağın gün açık</li><li>Etkinlik çıkışı kalabalık ve durak durumu</li><li>Gün boyu reklamsız</li></ul>
+          <button class="btn btn-ghost" onclick="P.buy('daypass','once')">Bugün için al</button>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:16px">Ödeme öncesi kadınlara özel kısa bir doğrulama (yüz taraması) yapılır. Demo sürümde gerçek ödeme alınmaz; kart bilgisi kaydedilmez ve hiçbir yere gönderilmez.</p>`;
+  },
+  buy(kind, cycle){
+    if(!state.user || state.user.guest){ S.close(); toast('Önce giriş yap', 'Paketi hesabına tanımlamamız gerekiyor.'); return; }
+    // Akış: kadınlara özel doğrulama (yüz taraması) → kart bilgisi → etkinleştirme
+    Verify.start(kind, cycle);
+  },
+  /* kart bilgisi sayfası (demo — bilgi ne saklanır ne gönderilir) */
+  cardForm(kind, cycle){
+    const priceTxt = kind === 'daypass'
+      ? money(PLANS.daypass.once) + ' (tek sefer)'
+      : money(cycle === 'm' ? PLANS[kind].m : PLANS[kind].y) + (cycle === 'm' ? ' / ay' : ' / yıl');
+    S.raw(`<h2>Ödeme</h2>
+      <p style="color:var(--muted);margin:0 0 4px">Doğrulama tamam ✓ — son adım.</p>
+      <div class="note" style="border-color:rgba(116,224,180,.4);color:var(--mint);margin:10px 0 16px">
+        Tutar: <b>${priceTxt}</b></div>
+      <form id="cardForm" onsubmit="P.pay(event,'${esc(kind)}','${esc(cycle)}')" autocomplete="off">
+        <label class="field"><span>Kart üzerindeki isim</span>
+          <input type="text" id="ccName" autocomplete="off" placeholder="Deniz Yılmaz" required></label>
+        <label class="field"><span>Kart numarası</span>
+          <input type="text" id="ccNum" inputmode="numeric" autocomplete="off" placeholder="0000 0000 0000 0000"
+                 maxlength="19" oninput="P.fmtCard(this)" required></label>
+        <div class="row-between" style="gap:12px">
+          <label class="field" style="flex:1"><span>Son kullanma</span>
+            <input type="text" id="ccExp" inputmode="numeric" autocomplete="off" placeholder="AA/YY" maxlength="5" oninput="P.fmtExp(this)" required></label>
+          <label class="field" style="flex:1"><span>CVC</span>
+            <input type="password" id="ccCvc" inputmode="numeric" autocomplete="off" placeholder="•••" maxlength="4" required></label>
+        </div>
+        <p class="err" id="cardErr" role="alert"></p>
+        <button class="btn btn-primary" type="submit" style="margin-top:6px">${priceTxt} — Öde ve başlat</button>
+      </form>
+      <p class="note" style="margin-top:14px">🔒 Demo: kart bilgisi yalnızca tarayıcında biçim kontrolünden geçer;
+      <b>kaydedilmez, sunucuya gönderilmez</b>. Gerçek dağıtımda bu alan Stripe/iyzico gibi bir sağlayıcının
+      güvenli alanıyla (PCI-DSS) değiştirilmelidir.</p>`);
+  },
+  fmtCard(el){ el.value = el.value.replace(/\D/g,'').slice(0,16).replace(/(.{4})/g,'$1 ').trim(); },
+  fmtExp(el){ let v = el.value.replace(/\D/g,'').slice(0,4); if(v.length>=3) v = v.slice(0,2)+'/'+v.slice(2); el.value = v; },
+  luhn(num){ let s=0, alt=false; for(let i=num.length-1;i>=0;i--){ let d=+num[i]; if(alt){ d*=2; if(d>9)d-=9; } s+=d; alt=!alt; } return num.length>=13 && s%10===0; },
+  pay(e, kind, cycle){
+    e.preventDefault();
+    const err = $('#cardErr'); err.textContent = '';
+    const num = ($('#ccNum').value || '').replace(/\s/g,'');
+    const exp = ($('#ccExp').value || '');
+    if(!P.luhn(num)){ err.textContent = 'Kart numarası geçersiz görünüyor.'; return; }
+    if(!/^\d{2}\/\d{2}$/.test(exp)){ err.textContent = 'Son kullanma tarihini AA/YY yaz.'; return; }
+    if(($('#ccCvc').value||'').length < 3){ err.textContent = 'CVC eksik.'; return; }
+    // Demo: kart verisi burada bırakılır — hiçbir yere yazılmaz/gönderilmez.
+    P.activate(kind, cycle);
+  },
+  activate(kind, cycle){
+    const now = Date.now(), day = 864e5;
+    let until, label;
+    if(kind === 'daypass'){ const e = new Date(); e.setHours(23,59,59,999); until = e.getTime(); label = 'Etkinlik günü paketi'; }
+    else { until = now + (cycle === 'y' ? 365*day : 30*day); label = PLANS[kind].n + (cycle==='y'?' (yıllık)':' (aylık)'); }
+    state.user.plan = {kind, cycle, until, label};
+    saveUser(); grant('muse'); Ad.render(); Me.render(); S.close();
+    toast(label + ' etkin', 'Reklamlar kapandı, Dia sınırsız.');
+  }
+};
+
+/* ============================================================
+   KADINLARA ÖZEL DOĞRULAMA — canlı yüz taraması
+   Siber güvenliğe uygun tasarım:
+   • Kamera görüntüsü YALNIZCA cihazda işlenir; hiçbir kare kaydedilmez veya
+     sunucuya gönderilmez. Sonuç olarak yalnızca "doğrulandı" bayrağı tutulur.
+   • Tarama, canlılık (liveness) + yüz varlığı kontrolüdür; statik fotoğraf/bot
+     denemelerini eler. Ham biyometrik veri hiçbir zaman cihazdan çıkmaz (KVKK/
+     GDPR açısından en güvenli yaklaşım).
+   • Otomatik cinsiyet sınıflandırması KASITLI olarak yapılmaz: yüzden cinsiyet
+     tahmini güvenilmezdir ve dışlayıcıdır. Doğrulama; canlılık + kullanıcı beyanı
+     ile yapılır, kamerası olmayanlar için insan-incelemeli yedek yol bırakılır.
+   ============================================================ */
+const Verify = {
+  stream: null, raf: null, active: false, kind: null, cycle: null,
+  start(kind, cycle){ Verify.kind = kind; Verify.cycle = cycle; S.raw(Verify.consentHtml()); },
+  consentHtml(){
+    return `<h2>Kadınlara özel doğrulama</h2>
+      <p style="color:var(--muted);margin:0 0 12px">DIANA kadınlara özel bir topluluktur. Devam etmeden önce
+      kısa bir <b>canlı yüz taraması</b> yapıyoruz; bu adım sahte ve otomatik hesapları eler.</p>
+      <div class="note" style="line-height:1.65">🔒 <b>Gizlilik:</b> Kamera yalnızca <b>bu cihazda</b> çalışır.
+        Görüntü <b>kaydedilmez</b>, sunucuya <b>gönderilmez</b>; yalnızca “doğrulandı” sonucu tutulur.
+        İstediğin an vazgeçebilirsin.</div>
+      <label class="check" style="margin:14px 0 4px;color:var(--paper)"><input type="checkbox" id="vConsent">
+        Yüz taramasıyla doğrulamayı ve kadınlara özel alan koşullarını kabul ediyorum.</label>
+      <p class="err" id="vErr"></p>
+      <button class="btn btn-primary" style="margin-top:10px" onclick="Verify.begin()">Taramayı başlat</button>
+      <button class="btn-line" style="margin:8px auto 0" onclick="Verify.manual()">Kameram yok / farklı yöntem</button>
+      <button class="btn-line" style="margin:2px auto 0" onclick="Verify.abort()">Vazgeç</button>`;
+  },
+  scanHtml(){
+    return `<h2>Yüz taraması</h2>
+      <p style="color:var(--muted);margin:0 0 10px" id="vStatus">Yüzünü çerçeveye ortala ve hafifçe hareket et…</p>
+      <div class="vwrap"><video id="vVideo" playsinline muted></video></div>
+      <div class="bar" style="margin-top:14px"><i id="vBar" style="width:0%"></i></div>
+      <button class="btn btn-ghost" id="vRetry" hidden style="margin-top:12px" onclick="Verify.begin()">Tekrar dene</button>
+      <button class="btn-line" id="vFallback" hidden style="margin:8px auto 0" onclick="Verify.manual()">Sorun mu var? Farklı yöntem</button>
+      <button class="btn-line" style="margin:4px auto 0" onclick="Verify.abort()">Vazgeç</button>`;
+  },
+  setStatus(t, cls){ const el = $('#vStatus'); if(el){ el.textContent = t; el.style.color = cls==='warn'?'var(--signal)':cls==='ok'?'var(--mint)':'var(--muted)'; } },
+  setBar(pct){ const b = $('#vBar'); if(b) b.style.width = pct + '%'; },
+  async begin(){
+    const cb = $('#vConsent');
+    if(cb && !cb.checked){ $('#vErr').textContent = 'Devam etmek için onay kutusunu işaretle.'; return; }
+    Verify.stop();
+    S.raw(Verify.scanHtml());
+    if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+      Verify.setStatus('Bu tarayıcı kamera taramasını desteklemiyor.', 'warn');
+      $('#vFallback').hidden = false; return;
+    }
+    try {
+      Verify.stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ ideal:480 } }, audio:false });
+    } catch(e){
+      Verify.setStatus('Kameraya erişilemedi. İzin ver ya da farklı yöntemi seç.', 'warn');
+      $('#vFallback').hidden = false; return;
+    }
+    const v = $('#vVideo'); if(!v){ Verify.stop(); return; }
+    v.srcObject = Verify.stream; try { await v.play(); } catch(e){}
+    Verify.run(v);
+  },
+  skinRatio(data){
+    let skin = 0, total = 0;
+    for(let i = 0; i < data.length; i += 40){
+      const r = data[i], g = data[i+1], b = data[i+2]; total++;
+      if(r > 95 && g > 40 && b > 20 && r > g && r > b && (r - Math.min(g,b)) > 15) skin++;
+    }
+    return total ? skin/total : 0;
+  },
+  run(video){
+    Verify.active = true;
+    const detector = ('FaceDetector' in window) ? new window.FaceDetector({ fastMode:true, maxDetectedFaces:1 }) : null;
+    const W = 160, H = 120;
+    const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d', { willReadFrequently:true });
+    const NEED = 3200;                       // ~3.2 sn canlılık penceresi
+    const start = Date.now();
+    let samples = 0, faceFrames = 0, movingFrames = 0, last = null;
+
+    const tick = async () => {
+      if(!Verify.active) return;
+      samples++;
+      let hasFace = false;
+      if(detector){
+        try { const f = await detector.detect(video); if(f && f.length) hasFace = true; }
+        catch(e){ /* bazı tarayıcılarda detect atar → ten-rengi yedeğine düşülür */ }
+      }
+      try { ctx.drawImage(video, 0, 0, W, H); } catch(e){}
+      let img = null; try { img = ctx.getImageData(0, 0, W, H).data; } catch(e){}
+      if(img){
+        if(!detector && Verify.skinRatio(img) > 0.05) hasFace = true;   // yedek yüz varlığı
+        if(last){
+          let diff = 0, n = 0;
+          for(let i = 0; i < img.length; i += 40){ diff += Math.abs(img[i] - last[i]); n++; }
+          if(n && diff/n > 3) movingFrames++;                          // canlılık: kare-arası hareket
+        }
+        last = img;
+      }
+      if(hasFace) faceFrames++;
+      const elapsed = Date.now() - start;
+      Verify.setBar(Math.min(100, Math.round(elapsed / NEED * 100)));
+      if(elapsed >= NEED){
+        const okFace = faceFrames >= Math.max(6, Math.floor(samples * 0.5));
+        const alive  = movingFrames >= 3;
+        if(okFace && alive){ Verify.success(); }
+        else {
+          Verify.stop();
+          Verify.setStatus(!okFace ? 'Yüz net algılanamadı. Işığı artır, yüzünü ortala ve tekrar dene.'
+                                   : 'Canlılık doğrulanamadı. Tarama sırasında hafifçe hareket et.', 'warn');
+          const rb = $('#vRetry'), fb = $('#vFallback'); if(rb) rb.hidden = false; if(fb) fb.hidden = false;
+        }
+        return;
+      }
+      Verify.raf = requestAnimationFrame(tick);
+    };
+    Verify.raf = requestAnimationFrame(tick);
+  },
+  success(){
+    Verify.setBar(100); Verify.setStatus('Doğrulandı ✓', 'ok');
+    Verify.stop();
+    if(state.user){ state.user.verified = true; state.user.verifiedAt = Date.now(); state.user.verifyMethod = 'liveness'; saveUser(); }
+    setTimeout(() => P.cardForm(Verify.kind, Verify.cycle), 650);
+  },
+  manual(){
+    Verify.stop();
+    S.raw(`<h2>Farklı doğrulama</h2>
+      <p style="color:var(--muted);margin:0 0 12px">Kameran yoksa doğrulama, kısa bir görüntülü destek görüşmesiyle
+      yapılır. Bu demo sürümünde adımı atlıyor ve başvurunu <b>inceleme sırasına</b> alıyoruz.</p>
+      <label class="check" style="margin:6px 0 4px;color:var(--paper)"><input type="checkbox" id="vDecl">
+        Kadınlara özel alan koşullarını kabul ediyorum.</label>
+      <p class="err" id="vErr2"></p>
+      <button class="btn btn-primary" style="margin-top:10px" onclick="Verify.manualOk()">Devam et</button>
+      <button class="btn-line" style="margin:6px auto 0" onclick="Verify.abort()">Vazgeç</button>`);
+  },
+  manualOk(){
+    const cb = $('#vDecl');
+    if(cb && !cb.checked){ $('#vErr2').textContent = 'Devam etmek için onay kutusunu işaretle.'; return; }
+    if(state.user){ state.user.verified = 'pending'; state.user.verifyMethod = 'manual'; saveUser(); }
+    P.cardForm(Verify.kind, Verify.cycle);
+  },
+  stop(){
+    Verify.active = false;
+    if(Verify.raf){ cancelAnimationFrame(Verify.raf); Verify.raf = null; }
+    if(Verify.stream){ try { Verify.stream.getTracks().forEach(t => t.stop()); } catch(e){} Verify.stream = null; }
+  },
+  abort(){ Verify.stop(); S.close(); }
+};
+
+/* ============================================================
+   GEZİNME
+   ============================================================ */
+const TITLES = {
+  map:  ['Aydınlık rota', 'Çevrendeki yerler'],
+  list: ['Yerler', 'Işık puanına göre sıralı'],
+  badges:['Işıkların', 'Puan ve rozetler'],
+  com:  ['Komünite', 'Kadınlar için topluluk ağı'],
+  dia:  ['Dia', 'Yol arkadaşın'],
+  me:   ['Profil', 'Hesap ve paket']
+};
+const U = {
+  go(tab){
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+    $('#view-' + tab).classList.add('on');
+    document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+    $('#topTitle').textContent = TITLES[tab][0];
+    $('#topSub').textContent = TITLES[tab][1];
+    if(tab === 'map' && state.map) setTimeout(() => state.map.invalidateSize(), 60);
+    if(tab === 'com') Com.render();
+    if(tab === 'badges') B.render();
+    if(tab === 'me') Me.render();
+    if(tab === 'dia') setTimeout(()=>{ const c=$('#chat'); c.scrollTop = c.scrollHeight; }, 40);
+  }
+};
+
+/* ============================================================
+   HARİTA
+   ============================================================ */
+const M = {
+  build(){
+    state.places = SEED.map(s => ({
+      ...s,
+      ll: [state.center[0] + s.dLat, state.center[1] + s.dLng],
+      r: s.r.map(x => ({...x}))
+    }));
+    ((state.user && state.user.streets) || []).forEach(t => {
+      if(state.places.some(p => p.id === t.id)) return;
+      state.places.push({id:t.id, name:t.name, cat:'geçit', ll:t.ll, note:t.note, h:'24',
+        r:[{u:(state.user.name||'Sen'), v:t.v, c:t.c, d:0, mine:true, ts:t.ts}]});
+    });
+    // kullanıcının bu cihazdaki değerlendirmeleri
+    const mine = (state.user && state.user.reviews) || [];
+    mine.forEach(rv => {
+      const p = state.places.find(x => x.id === rv.pid);
+      if(p && !p.r.some(x => x.mine && x.ts === rv.ts))
+        p.r.unshift({u: (state.user.name||'Sen'), v: rv.v, c: rv.c, d: 0, mine:true, ts: rv.ts});
+    });
+  },
+  /* Döşeme sağlayıcıları — ilki yüklenmezse otomatik sıradakine geçer.
+     MAP_KEY doldurulursa MapTiler kullanılır (en güvenilir, ücretsiz katman). */
+  /* Döşeme sağlayıcıları. CARTO listeden çıkarıldı: ücretsiz kullanımda
+     döşemelerin üstüne "API KEY REQUIRED" filigranı basıyor.
+     Buradakilerin hiçbiri anahtar istemez. */
+  providers(){
+    const list = [];
+    if(MAP_KEY) list.push({
+      n:'MapTiler', url:`https://api.maptiler.com/maps/streets-v2-dark/{z}/{x}/{y}.png?key=${MAP_KEY}`,
+      opt:{maxZoom:20, attribution:'&copy; MapTiler &copy; OpenStreetMap'}
+    });
+    list.push(
+      {n:'OpenStreetMap', dark:true, url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+       opt:{maxZoom:19, attribution:'&copy; OpenStreetMap katkıcıları'}},
+      {n:'Esri koyu', url:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+       opt:{maxZoom:16, attribution:'&copy; Esri, HERE, Garmin'}},
+      {n:'Esri uydu', url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+       opt:{maxZoom:18, attribution:'&copy; Esri'}}
+    );
+    return list;
+  },
+  pi: 0, tiles: null, watchdog: null,
+  layer(i){
+    const list = M.providers();
+    M.pi = ((i % list.length) + list.length) % list.length;
+    const prov = list[M.pi];
+    if(M.tiles) state.map.removeLayer(M.tiles);
+    clearTimeout(M.watchdog);
+    $('#map').classList.remove('no-tiles');
+    $('#map').classList.toggle('osm-dark', !!prov.dark);
+    let ok = 0, bad = 0;
+    M.tiles = L.tileLayer(prov.url, prov.opt).addTo(state.map);
+    M.tiles.on('tileload', () => { ok++; clearTimeout(M.watchdog); });
+    M.tiles.on('tileerror', () => { if(++bad > 5 && ok === 0) M.next(); });
+    // 6 saniyede tek döşeme gelmediyse sıradaki sağlayıcıya geç.
+    // Kapsayıcı henüz ölçülmediyse (gizli sekme) beklemeye devam et.
+    const watch = () => {
+      M.watchdog = setTimeout(() => {
+        const sz = state.map.getSize();
+        if(sz.x < 40 || sz.y < 40){ state.map.invalidateSize(); return watch(); }
+        if(ok === 0) M.next();
+      }, 6000);
+    };
+    watch();
+    const b = $('#layerBtn'); if(b) b.title = 'Harita katmanı: ' + prov.n;
+  },
+  next(){
+    if(M.pi + 1 < M.providers().length){ M.layer(M.pi + 1); }
+    else { $('#map').classList.add('no-tiles'); clearTimeout(M.watchdog); }
+  },
+  cycle(){ M.layer(M.pi + 1 < M.providers().length ? M.pi + 1 : 0); toast('Katman değişti', M.providers()[M.pi].n); },
+  init(){
+    M.build();
+    if(state.map){ M.paint(); return; }
+    if(typeof L === 'undefined'){
+      $('#map').innerHTML = `<div style="padding:26px;color:#a79fd0;font-size:14px;line-height:1.6">
+        <b style="color:#efeaff;font-family:var(--font-d);font-size:17px;display:block;margin-bottom:8px">Harita kitaplığı yüklenemedi</b>
+        Leaflet dosyası cdnjs üzerinden gelemedi. İnternet bağlantını kontrol et ya da
+        <code>leaflet.min.js</code> ve <code>leaflet.min.css</code> dosyalarını proje klasörüne
+        indirip bağlantıları yerel yolla değiştir.</div>`;
+      return;
+    }
+    state.map = L.map('map', {zoomControl:false, attributionControl:true}).setView(state.center, 15);
+    M.layer(0);
+    M.chips(); M.paint();
+    if(isSafari || isIOS){
+      // Safari, sayfa açılır açılmaz gelen konum isteğini çoğu zaman sormadan reddediyor;
+      // izin kutusunun çıkması için isteğin bir dokunuşla başlaması gerekiyor.
+      Nav.status('Konumunu bulmak için sağdaki <b>◎</b> düğmesine dokun.', 'wait');
+    } else {
+      Nav.status('Konumun bulunuyor…', 'wait');
+      M.locate(true);
+      setTimeout(() => { if(!state.located && !state.manualStart)
+        Nav.status('Konumun alınamadı. Sağdaki ◎ ile tekrar dene ya da “Nereden” alanına yerini yaz.', 'warn'); }, 13000);
+    }
+    // Leaflet gizli/yeni ölçülen kapsayıcıda boyutu kaçırabiliyor
+    [0, 120, 400, 1000].forEach(ms => setTimeout(() => state.map.invalidateSize(), ms));
+    addEventListener('resize', () => state.map.invalidateSize());
+    if(window.ResizeObserver) new ResizeObserver(() => state.map.invalidateSize()).observe($('#map'));
+  },
+  chips(){
+    const html = CATS.map(c =>
+      `<button class="chip" aria-pressed="${state.filter===c}" onclick="M.filter('${c}')">${c==='hepsi'?'Tümü':c}</button>`).join('');
+    $('#mapChips').innerHTML = html;
+    $('#listChips').innerHTML = html.replace(/M\.filter/g, 'Lst.filter');
+  },
+  filter(c){ state.filter = c; M.chips(); M.paint(); Lst.render(); },
+  paint(){
+    Object.values(state.layers).forEach(l => state.map.removeLayer(l));
+    state.layers = {};
+    const rs = state.routeSpots;
+    state.places
+      .filter(p => state.filter === 'hepsi' || p.cat === state.filter)
+      .filter(p => !(rs && rs.has(p.id)))      // bunlar rota katmanında ayrıca çiziliyor
+      .forEach(p => {
+        const s = score(p), col = color(s);
+        const dim = rs && rs.size ? .32 : 1;
+        const icon = L.divIcon({
+          className:'', iconSize:[18,18], iconAnchor:[9,9],
+          html:`<div class="dot" style="background:${col};opacity:${dim};box-shadow:0 0 ${6+s*3}px ${1+s}px ${col}66"></div>`
+        });
+        const mk = L.marker(p.ll, {icon, title:p.name}).addTo(state.map);
+        mk.bindTooltip(`${p.name} · ${s.toFixed(1)}`, {direction:'top', offset:[0,-10], className:'tt'});
+        mk.on('click', () => S.place(p.id));
+        state.layers[p.id] = mk;
+      });
+  },
+  me(ll, real){
+    if(state.meMarker) state.map.removeLayer(state.meMarker);
+    state.meMarker = L.marker(ll, {icon: L.divIcon({className:'', iconSize:[16,16], iconAnchor:[8,8],
+      html:`<div class="dot me ${real === false ? '' : 'pulse'}"></div>`})}).addTo(state.map);
+    state.meMarker.bindTooltip(real === false ? 'Seçilen başlangıç' : 'Buradasın',
+      {direction:'top', offset:[0,-10]});
+  },
+  /* haritayı ve çevredeki yerleri verilen noktaya taşı */
+  setCenter(ll, name, keepFrom){
+    state.center = ll;
+    M.build(); M.paint();
+    if(!keepFrom) R.from = {name: name || 'Seçilen başlangıç', ll, me: name === 'Konumum'};
+    M.me(ll, name === 'Konumum');
+    if(state.map) state.map.setView(ll, 16);
+    Lst.render();
+  },
+
+  help(){
+    const ios = `<b style="color:var(--paper)">iPhone / iPad — Safari</b>
+      <ol style="margin:8px 0 0;padding-left:20px;line-height:1.7">
+        <li>Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri açık olmalı.</li>
+        <li>Aynı listede <b>Safari Web Siteleri</b> → “Uygulamayı Kullanırken”i seç.</li>
+        <li>Safari’ye dön, sayfayı yenile, adres çubuğundaki <b>ᴀA</b> → Web Sitesi Ayarları → Konum → İzin ver.</li>
+        <li>Uygulamayı ana ekrana eklediysen izni bir kez daha sorabilir.</li>
+      </ol>`;
+    const mac = `<b style="color:var(--paper)">Mac — Safari</b>
+      <ol style="margin:8px 0 0;padding-left:20px;line-height:1.7">
+        <li>Safari → Ayarlar → Web Siteleri → Konum.</li>
+        <li>Listede bu siteyi bul, <b>İzin Ver</b> yap.</li>
+        <li>Sistem Ayarları → Gizlilik ve Güvenlik → Konum Servisleri’nde Safari açık olmalı.</li>
+      </ol>`;
+    const chrome = `<b style="color:var(--paper)">Chrome</b>
+      <ol style="margin:8px 0 0;padding-left:20px;line-height:1.7">
+        <li>Adres çubuğunun solundaki kilit veya ayar simgesine dokun.</li>
+        <li>Konum → İzin ver, sonra sayfayı yenile.</li>
+      </ol>`;
+    S.raw(`<h2>Konum izni</h2>
+      <p style="color:var(--muted);margin:0 0 14px">Konum yalnızca rota hesaplamak için kullanılır,
+      hiçbir yere gönderilmez. İzin vermek istemiyorsan “Nereden” alanına yerini yazabilirsin.</p>
+      <div class="note" style="line-height:1.6">${isIOS ? ios : isSafari ? mac : chrome}</div>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="S.close();M.locate()">İzin verdim, tekrar dene</button>
+      <button class="btn-line" style="margin:8px auto 0" onclick="S.close();Nav.focusFrom()">Yerimi elle yazayım</button>`);
+  },
+
+  locate(silent){
+    if(!navigator.geolocation){
+      state.located = false;
+      Nav.status('Bu tarayıcı konum servisini desteklemiyor. Başlangıcı elle yaz.', 'warn');
+      return;
+    }
+    if(location.protocol !== 'https:' && location.hostname !== 'localhost'){
+      Nav.status('Konum yalnızca https adreste çalışır. Siteyi https ile aç ya da başlangıcı elle yaz.', 'warn');
+      return;
+    }
+    if(!state.manualStart) Nav.status('Konumun bulunuyor…', 'wait');
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const ll = [pos.coords.latitude, pos.coords.longitude];
+        const acc = Math.round(pos.coords.accuracy || 0);
+        state.located = true; state.manualStart = false;
+        M.setCenter(ll, 'Konumum');
+        Nav.sync();
+        Nav.status(acc > 300
+          ? `Konumun bulundu ama hassasiyet düşük (yaklaşık ${acc} m). Wi-Fi yerine mobil veriyle ya da açık alanda daha iyi sonuç verir; istersen başlangıcı elle yaz.`
+          : `Konumun bulundu · ±${acc} m`, acc > 300 ? 'warn' : 'ok');
+        R.card();
+      },
+      err => {
+        state.located = false;
+        const msg = err.code === 1
+          ? 'Konum izni verilmedi. <button class="btn-line" style="padding:0;font-size:12.5px" onclick="M.help()">Nasıl açılır?</button>'
+          : err.code === 3
+          ? 'Konum zaman aşımına uğradı. Sağdaki ◎ ile tekrar dene ya da başlangıcı elle yaz.'
+          : 'Konum alınamadı. <button class="btn-line" style="padding:0;font-size:12.5px" onclick="M.help()">Nasıl açılır?</button>';
+        if(!state.manualStart) Nav.status(msg, 'warn');
+        if(!silent) toast('Konum yok', 'Başlangıç alanına nerede olduğunu yazabilirsin.');
+        M.me(state.center, false);
+      },
+      {enableHighAccuracy: true, timeout: 12000, maximumAge: 30000}
+    );
+  },
+
+  route(id){
+    const t = state.places.find(p => p.id === id);
+    R.to = {name: t.name, ll: t.ll}; R.qt = t.name; R.resT = []; R.options = [];
+    if(!R.from) R.from = R.here();
+    Nav.sync();
+    S.close(); U.go('map');
+    setTimeout(() => { R.open(); R.find(); }, 80);
+  }
+};
+
+/* ============================================================
+   ROTA — adres arama + gerçek yol rotaları + seçenek üretme
+   ============================================================ */
+const GEO  = 'https://nominatim.openstreetmap.org/search';
+
+/* ---------- yerleşik yer veritabanı ----------
+   Ağ engellenmiş olsa bile il, ilçe ve semt araması çalışsın diye
+   uygulamanın içinde duruyor. Çevrimiçi sonuçlarla birleştirilir. */
+const GAZ = `Adana|37.0000|35.3213
+Adıyaman|37.7648|38.2786
+Afyonkarahisar|38.7507|30.5567
+Ağrı|39.7191|43.0503
+Aksaray|38.3687|34.0370
+Amasya|40.6499|35.8353
+Ankara|39.9334|32.8597
+Antalya|36.8969|30.7133
+Ardahan|41.1105|42.7022
+Artvin|41.1828|41.8183
+Aydın|37.8560|27.8416
+Balıkesir|39.6484|27.8826
+Bartın|41.6344|32.3375
+Batman|37.8812|41.1351
+Bayburt|40.2552|40.2249
+Bilecik|40.1451|29.9799
+Bingöl|38.8854|40.4980
+Bitlis|38.4006|42.1095
+Bolu|40.7392|31.6089
+Burdur|37.7203|30.2908
+Bursa|40.1826|29.0665
+Çanakkale|40.1553|26.4142
+Çankırı|40.6013|33.6134
+Çorum|40.5506|34.9556
+Denizli|37.7765|29.0864
+Diyarbakır|37.9144|40.2306
+Düzce|40.8438|31.1565
+Edirne|41.6818|26.5623
+Elazığ|38.6810|39.2264
+Erzincan|39.7500|39.5000
+Erzurum|39.9000|41.2700
+Eskişehir|39.7767|30.5206
+Gaziantep|37.0662|37.3833
+Giresun|40.9128|38.3895
+Gümüşhane|40.4386|39.5086
+Hakkari|37.5744|43.7408
+Hatay|36.2025|36.1606
+Iğdır|39.9237|44.0450
+Isparta|37.7648|30.5566
+İstanbul|41.0082|28.9784
+İzmir|38.4237|27.1428
+Kahramanmaraş|37.5858|36.9371
+Karabük|41.2061|32.6204
+Karaman|37.1811|33.2150
+Kars|40.6013|43.0975
+Kastamonu|41.3887|33.7827
+Kayseri|38.7312|35.4787
+Kilis|36.7184|37.1212
+Kırıkkale|39.8468|33.5153
+Kırklareli|41.7333|27.2167
+Kırşehir|39.1425|34.1709
+Kocaeli|40.8533|29.8815
+Konya|37.8746|32.4932
+Kütahya|39.4167|29.9833
+Malatya|38.3552|38.3095
+Manisa|38.6191|27.4289
+Mardin|37.3212|40.7245
+Mersin|36.8000|34.6333
+Muğla|37.2153|28.3636
+Muş|38.9462|41.7539
+Nevşehir|38.6939|34.6857
+Niğde|37.9667|34.6833
+Ordu|40.9839|37.8764
+Osmaniye|37.0742|36.2462
+Rize|41.0201|40.5234
+Sakarya|40.6940|30.4358
+Samsun|41.2867|36.3300
+Siirt|37.9333|41.9500
+Sinop|42.0231|35.1531
+Sivas|39.7477|37.0179
+Şanlıurfa|37.1591|38.7969
+Şırnak|37.5164|42.4611
+Tekirdağ|40.9833|27.5167
+Tokat|40.3167|36.5500
+Trabzon|41.0027|39.7168
+Tunceli|39.1079|39.5401
+Uşak|38.6823|29.4082
+Van|38.4891|43.4089
+Yalova|40.6500|29.2667
+Yozgat|39.8181|34.8147
+Zonguldak|41.4564|31.7987
+Kadıköy, İstanbul|40.9906|29.0300
+Beşiktaş, İstanbul|41.0430|29.0094
+Üsküdar, İstanbul|41.0226|29.0173
+Şişli, İstanbul|41.0602|28.9877
+Beyoğlu, İstanbul|41.0369|28.9773
+Taksim, İstanbul|41.0370|28.9850
+Fatih, İstanbul|41.0158|28.9497
+Bakırköy, İstanbul|40.9819|28.8772
+Maltepe, İstanbul|40.9351|29.1560
+Ataşehir, İstanbul|40.9833|29.1167
+Kartal, İstanbul|40.8886|29.1856
+Pendik, İstanbul|40.8776|29.2380
+Sarıyer, İstanbul|41.1670|29.0500
+Beylikdüzü, İstanbul|41.0016|28.6415
+Esenyurt, İstanbul|41.0289|28.6800
+Bahçelievler, İstanbul|41.0000|28.8500
+Kağıthane, İstanbul|41.0862|28.9700
+Ümraniye, İstanbul|41.0165|29.1248
+Zeytinburnu, İstanbul|40.9944|28.9036
+Avcılar, İstanbul|40.9800|28.7214
+Başakşehir, İstanbul|41.0930|28.8020
+Çankaya, Ankara|39.9179|32.8627
+Kızılay, Ankara|39.9200|32.8541
+Keçiören, Ankara|39.9800|32.8700
+Yenimahalle, Ankara|39.9700|32.7500
+Mamak, Ankara|39.9400|32.9200
+Etimesgut, Ankara|39.9500|32.6700
+Konak, İzmir|38.4189|27.1287
+Karşıyaka, İzmir|38.4600|27.1200
+Bornova, İzmir|38.4700|27.2200
+Alsancak, İzmir|38.4380|27.1420
+Buca, İzmir|38.3900|27.1800
+Onikişubat, Kahramanmaraş|37.5900|36.9300
+Dulkadiroğlu, Kahramanmaraş|37.5750|36.9450
+Elbistan, Kahramanmaraş|38.2064|37.1983
+Nilüfer, Bursa|40.2130|28.9870
+Osmangazi, Bursa|40.1950|29.0610
+Selçuklu, Konya|37.9000|32.4900
+Şahinbey, Gaziantep|37.0500|37.3800`.split('\n').map(r => {
+  const [n, la, lo] = r.split('|');
+  return {name: n, ll: [parseFloat(la), parseFloat(lo)]};
+});
+const fold = t => String(t).toLocaleLowerCase('tr')
+  .replace(/ı/g,'i').replace(/İ/g,'i').replace(/ş/g,'s').replace(/ğ/g,'g')
+  .replace(/ü/g,'u').replace(/ö/g,'o').replace(/ç/g,'c').trim();
+
+function localGeo(q){
+  const f = fold(q);
+  if(f.length < 2) return [];
+  const c = state.center;
+  return GAZ.filter(x => fold(x.name).includes(f))
+    .sort((a,b) => (fold(a.name).indexOf(f) - fold(b.name).indexOf(f))
+                || (dist(c, a.ll) - dist(c, b.ll)))
+    .slice(0, 5)
+    .map(x => ({name: x.name, full: x.name + ', Türkiye', ll: x.ll, local: true}));
+}
+
+async function geocode(q){
+  const c = state.center;
+  const errs = [];
+  const near = localGeo(q);            // her zaman elimizde olan sonuçlar
+  const merge = list => {
+    const out = [...near];
+    (list || []).forEach(x => { if(!out.some(y => dist(y.ll, x.ll) < 400)) out.push(x); });
+    return out.slice(0, 7);
+  };
+
+  // 1) kendi sunucun üzerinden (Safari, reklam engelleyici ve kurumsal ağlarda tek güvenilir yol)
+  try {
+    const r = await fetch(`/.netlify/functions/geo?q=${encodeURIComponent(q)}&lat=${c[0]}&lon=${c[1]}`);
+    if(r.ok){
+      const d = await r.json();
+      if(Array.isArray(d) && d.length)
+        return merge(d.map(x => ({name: x.name, full: x.full, ll: [x.lat, x.lon]})));
+      if(Array.isArray(d) && near.length) return near;
+    } else errs.push('sunucu ' + r.status);
+  } catch(e){ errs.push('sunucu yok'); }
+
+  // 2) doğrudan Nominatim
+  const box = [c[1]-0.5, c[0]+0.4, c[1]+0.5, c[0]-0.4].join(',');
+  const tidy = t => t.split(',').slice(0,2).join(',').trim();
+  for(const extra of [`&viewbox=${box}`, '']){
+    try {
+      const r = await fetch(`${GEO}?format=jsonv2&limit=6&accept-language=tr&countrycodes=tr${extra}&q=${encodeURIComponent(q)}`);
+      if(!r.ok){ errs.push('nominatim ' + r.status); continue; }
+      const d = await r.json();
+      if(d.length) return merge(d.map(x => ({name: tidy(x.display_name), full: x.display_name,
+                                       ll: [parseFloat(x.lat), parseFloat(x.lon)]})));
+    } catch(e){ errs.push('nominatim engellendi'); }
+  }
+
+  // 3) Photon
+  try {
+    const r2 = await fetch(`https://photon.komoot.io/api/?limit=6&lat=${c[0]}&lon=${c[1]}&q=${encodeURIComponent(q)}`);
+    if(r2.ok){
+      const d2 = await r2.json();
+      const out = (d2.features || []).map(f => {
+        const p = f.properties || {};
+        const bits = [p.name, p.district, p.city || p.county, p.state].filter(Boolean);
+        return {name: bits.slice(0,2).join(', ') || q, full: bits.join(', '),
+                ll: [f.geometry.coordinates[1], f.geometry.coordinates[0]]};
+      });
+      if(out.length) return merge(out);
+    } else errs.push('photon ' + r2.status);
+  } catch(e){ errs.push('photon engellendi'); }
+
+  // 4) doğrudan koordinat yazıldıysa
+  const m = q.match(/(-?\d{1,2}[.,]\d{3,})[,\s]+(-?\d{1,3}[.,]\d{3,})/);
+  if(m) return [{name: 'Koordinat', full: m[1] + ', ' + m[2],
+                 ll: [parseFloat(m[1].replace(',', '.')), parseFloat(m[2].replace(',', '.'))]}];
+
+  if(near.length) return near;          // ağ yoksa bile il/ilçe araması çalışsın
+
+  const e = new Error('geo'); e.detail = errs.join(' · ');
+  throw e;
+}
+
+const OSRM = {
+  foot: ['https://routing.openstreetmap.de/routed-foot/route/v1/foot/'],
+  bike: ['https://routing.openstreetmap.de/routed-bike/route/v1/bike/'],
+  car:  ['https://routing.openstreetmap.de/routed-car/route/v1/driving/',
+         'https://router.project-osrm.org/route/v1/driving/']
+};
+const MODES = [
+  {k:'foot',   n:'Yürüme',        ic:'<path d="M13 4.5a1.6 1.6 0 1 0 0-.1"/><path d="m11 21 2-5-3-3 1-5 3 3 3 1"/><path d="m10 13-2 8"/>'},
+  {k:'car',    n:'Araç',          ic:'<path d="M4 16v-3l2-5h12l2 5v3"/><path d="M4 16h16v3h-3v-3M7 19H4v-3"/><circle cx="7.5" cy="16" r="1.2"/><circle cx="16.5" cy="16" r="1.2"/>'},
+  {k:'bike',   n:'Bisiklet',      ic:'<circle cx="6" cy="17" r="3.2"/><circle cx="18" cy="17" r="3.2"/><path d="M9 17h4l3-7h-3M13 10l-2.5 7M14 6h2.5"/>'},
+  {k:'transit',n:'Toplu taşıma',  ic:'<rect x="5" y="4" width="14" height="12" rx="2.5"/><path d="M5 11h14M8 20l1.5-2.5M16 20l-1.5-2.5"/><circle cx="8.6" cy="13.6" r=".9"/><circle cx="15.4" cy="13.6" r=".9"/>'}
+];
+
+/* OSRM manevralarını Türkçeye çevir */
+function maneuverText(st){
+  const m = st.maneuver || {}, name = (st.name || '').trim();
+  const mod = {left:'sola', right:'sağa', 'slight left':'hafif sola', 'slight right':'hafif sağa',
+               'sharp left':'keskin sola', 'sharp right':'keskin sağa', uturn:'geri dönüş yap',
+               straight:'düz devam et'}[m.modifier] || '';
+  const on = name ? ` — ${name}` : '';
+  let t;
+  switch(m.type){
+    case 'depart':     t = name ? `${name} boyunca ilerle` : 'Yola çık'; break;
+    case 'arrive':     t = 'Varış noktasına ulaştın'; break;
+    case 'turn':       t = mod ? `${mod} dön${on}` : `Dön${on}`; break;
+    case 'new name':   t = name ? `${name} boyunca devam et` : 'Devam et'; break;
+    case 'roundabout':
+    case 'rotary':     t = `Göbekte ${m.exit || 1}. çıkışı kullan${on}`; break;
+    case 'merge':      t = `${mod || 'Yola'} katıl${on}`; break;
+    case 'fork':       t = `Ayrımda ${mod || 'düz devam et'}${on}`; break;
+    case 'end of road':t = `Yol sonunda ${mod || 'dön'}${on}`; break;
+    default:           t = name ? `${name} boyunca devam et` : 'Devam et';
+  }
+  return t.charAt(0).toLocaleUpperCase('tr') + t.slice(1);
+}
+
+function osrmParse(d){
+  return d.routes.map(rt => ({
+    ll: rt.geometry.coordinates.map(c => [c[1], c[0]]),
+    m: rt.distance,
+    sec: rt.duration,
+    steps: (rt.legs || []).flatMap(l => (l.steps || []).map(st => ({
+      text: maneuverText(st),
+      m: st.distance,
+      ll: st.maneuver && st.maneuver.location ? [st.maneuver.location[1], st.maneuver.location[0]] : null
+    }))).filter(x => x.ll)
+  }));
+}
+
+async function osrm(coords, profile){
+  const prof = profile || (state.mode === 'transit' ? 'foot' : state.mode) || 'foot';
+  const path = coords.map(c => `${c[1]},${c[0]}`).join(';');
+  let last;
+
+  // 1) kendi sunucun üzerinden
+  try {
+    const r = await fetch(`/.netlify/functions/route?profile=${prof}&coords=${encodeURIComponent(path)}`);
+    if(r.ok){
+      const d = await r.json();
+      if(d.routes && d.routes.length) return osrmParse(d);
+    }
+  } catch(e){ /* fonksiyon yok, doğrudan dene */ }
+
+  for(const base of (OSRM[prof] || OSRM.foot)){
+    try {
+      const r = await fetch(`${base}${path}?alternatives=true&overview=full&geometries=geojson&steps=true`);
+      if(!r.ok){ last = new Error('http'); continue; }
+      const d = await r.json();
+      if(d.code !== 'Ok' || !d.routes || !d.routes.length){ last = new Error('code'); continue; }
+      return osrmParse(d);
+    } catch(e){ last = e; }
+  }
+  throw last || new Error('osrm');
+}
+
+const R = {
+  from: null, to: null, focus: null,
+  qf: '', qt: '', resF: [], resT: [],
+  options: [], sel: 0, lines: [], marks: [], loading: false, note: '', why: '', src: '', w: null,
+
+  here(){
+    const ll = state.meMarker ? [state.meMarker.getLatLng().lat, state.meMarker.getLatLng().lng] : state.center;
+    return {name:'Konumum', ll, me:true};
+  },
+  open(){ if(!R.from) R.from = R.here(); S.raw(R.html()); },
+
+  /* ---------- arayüz ---------- */
+  html(){
+    const field = (which) => {
+      const val = which === 'f' ? R.qf : R.qt;
+      const res = which === 'f' ? R.resF : R.resT;
+      const cur = which === 'f' ? R.from : R.to;
+      const id  = 'inp' + which;
+      return `
+        <div style="font-size:13px;color:var(--muted);margin:${which==='f'?'2px':'18px'} 0 5px">
+          ${which === 'f' ? 'Nereden' : 'Nereye'}</div>
+        ${cur ? `<div style="font-size:15px;font-weight:600;margin-bottom:7px">${esc(cur.name)}</div>` : ''}
+        <input id="${id}" type="text" value="${esc(val)}" placeholder="Adres, mahalle veya yer adı"
+               oninput="R.type('${which}',this.value)" autocomplete="off">
+        <div class="pickrow">
+          ${which === 'f' ? '<button class="chip" onclick="R.useHere()">Konumum</button>' : ''}
+          <button class="chip" onclick="R.pick('${which}')">Haritadan seç</button>
+        </div>
+        ${res.length ? `<div style="border:1px solid var(--ink-3);border-radius:12px;overflow:hidden;margin-top:4px">
+          ${res.map((x,i) => `<button onclick="R.choose('${which}',${i})"
+              style="display:block;width:100%;text-align:left;padding:11px 13px;border-bottom:1px solid rgba(255,255,255,.06)">
+              <b style="font-size:14px;font-weight:600">${esc(x.name)}</b>
+              <span style="display:block;font-size:12px;color:var(--muted);margin-top:2px">${esc(x.sub || '')}</span>
+            </button>`).join('')}</div>` : ''}`;
+    };
+
+    if(R.options.length && !R.loading) return R.resultsHtml();
+
+    return `<h2>Rota</h2>
+      <p style="color:var(--muted);margin:0 0 16px">Nereye gideceğini yaz; en hızlı, en güvenli ve en çok açık mekandan geçen yolu karşılaştırayım.</p>
+      ${field('f')}${field('t')}
+      <button class="btn ${R.to ? 'btn-primary' : 'btn-ghost'}" style="margin-top:20px" onclick="R.find()">
+        ${R.loading ? 'Rotalar aranıyor…' : 'Rotaları getir'}</button>
+      ${R.note ? `<p class="note" style="margin-top:12px">${esc(R.note)}</p>` : ''}`;
+  },
+
+  resultsHtml(){
+    return `<h2>Rota seçenekleri</h2>
+      <p style="color:var(--muted);margin:0 0 4px">${esc(R.from.name)} → ${esc(R.to.name)}</p>
+      ${R.why ? `<div class="note" style="margin:12px 0;border-color:rgba(255,200,97,.35)">
+          <b style="color:var(--halo)">Dia:</b> ${esc(R.why)}</div>` : ''}
+      ${R.w ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px">
+          Bu sıralamanın ağırlıkları — süre %${Math.round(R.w.sure*100)},
+          aydınlatma %${Math.round(R.w.isik*100)},
+          açık mekan %${Math.round(R.w.mekan*100)},
+          tenha noktadan kaçınma %${Math.round(R.w.tenha*100)}
+          ${R.src === 'llm' ? '' : ' · cihaz kuralları'}</div>` : ''}
+      ${R.note ? `<p class="note" style="margin:12px 0">${esc(R.note)}</p>` : ''}
+      <div style="margin-top:14px">
+      ${R.options.map((o,i) => `
+        <button onclick="R.select(${i})" style="display:block;width:100%;text-align:left;
+                border:1px solid ${i===R.sel?'var(--halo)':'var(--ink-3)'};border-radius:16px;
+                background:${i===R.sel?'rgba(255,200,97,.1)':'var(--ink-2)'};padding:14px;margin-bottom:10px">
+          <div class="row-between">
+            <span style="font-family:var(--font-d);font-weight:700;font-size:16px">${o.tags.join(' · ')}</span>
+            <span style="font-weight:700;color:${color(o.light)}">${o.light.toFixed(1)}</span>
+          </div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px">
+            ${Math.max(1,Math.round(o.sec/60))} dk · ${(o.m/1000).toFixed(2)} km · yol boyunca ${o.open} açık yer</div>
+          ${o.spots.length ? `<div style="font-size:12.5px;color:var(--mint);margin-top:5px">Açık: ${o.spots.map(p => esc(p.name)).join(', ')}</div>` : ''}
+          ${o.dark.length ? `<div style="font-size:12.5px;color:var(--signal);margin-top:5px">Düşük puanlı: ${o.dark.map(esc).join(', ')}</div>` : ''}
+        </button>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="btn btn-ghost" style="flex:1" onclick="Prefs.open()">Tercihlerim</button>
+        <button class="btn btn-primary" style="flex:1" onclick="R.apply()">Bu rotayı kullan</button>
+      </div>`;
+  },
+  refresh(focusId){
+    $('#sheetBody').innerHTML = '<div class="grab"></div>' + R.html();
+    if(focusId){
+      const el = document.getElementById(focusId);
+      if(el){ el.focus(); const n = el.value.length; el.setSelectionRange(n,n); }
+    }
+  },
+
+  /* ---------- adres arama ---------- */
+  type(which, v){
+    if(which === 'f') R.qf = v; else R.qt = v;
+    clearTimeout(R.t);
+    R.t = setTimeout(() => R.search(which), 600);
+  },
+  async search(which){
+    const q = (which === 'f' ? R.qf : R.qt).trim();
+    if(q.length < 3){ if(which==='f') R.resF = []; else R.resT = []; return R.refresh('inp'+which); }
+    // önce kayıtlı yerler
+    const local = state.places
+      .filter(p => p.name.toLocaleLowerCase('tr').includes(q.toLocaleLowerCase('tr')))
+      .map(p => ({name: p.name, sub: `${p.cat} · ışık ${score(p).toFixed(1)}`, ll: p.ll}));
+    let web = [];
+    try { web = (await geocode(q)).map(x => ({...x, sub: x.full.split(',').slice(2,5).join(',')})); }
+    catch(e){ R.note = local.length ? '' : 'Adres arama servisine ulaşılamadı. Haritadan nokta seçebilirsin.'; }
+    const res = [...local, ...web].slice(0, 7);
+    if(which === 'f') R.resF = res; else R.resT = res;
+    R.refresh('inp' + which);
+  },
+  choose(which, i){
+    const x = (which === 'f' ? R.resF : R.resT)[i];
+    if(which === 'f'){ R.from = {name:x.name, ll:x.ll}; R.qf = x.name; R.resF = []; }
+    else { R.to = {name:x.name, ll:x.ll}; R.qt = x.name; R.resT = []; }
+    R.refresh();
+  },
+  useHere(){ R.from = R.here(); R.qf = ''; R.resF = []; R.refresh(); },
+  pick(which){
+    S.close(); U.go('map');
+    $('#pickHint').classList.add('on');
+    $('#pickHint').textContent = which === 'f' ? 'Başlangıç noktasına dokun' : 'Varış noktasına dokun';
+    state.map.once('click', e => {
+      const ll = [e.latlng.lat, e.latlng.lng];
+      const near = state.places.find(p => dist(ll, p.ll) < 70);
+      const o = {name: near ? near.name : 'Haritada seçilen nokta', ll: near ? near.ll : ll};
+      if(which === 'f'){ R.from = o; R.qf = o.name; } else { R.to = o; R.qt = o.name; }
+      $('#pickHint').classList.remove('on');
+      R.open();
+    });
+  },
+  back(){ R.options = []; R.note = ''; R.refresh(); },
+
+  /* ---------- rota üretimi ---------- */
+  rate(ll){
+    const step = Math.max(1, Math.floor(ll.length / 200));
+    const pts = []; for(let i = 0; i < ll.length; i += step) pts.push(ll[i]);
+    pts.push(ll[ll.length-1]);
+    let sum = 0, w = 0; const dark = [], spots = [];
+    state.places.forEach(p => {
+      let dm = 1e9;
+      for(const q of pts){ const d = dist(q, p.ll); if(d < dm) dm = d; }
+      if(dm < 150){
+        const ww = 1 - dm / 150, sc = score(p);
+        sum += sc * ww; w += ww;
+        if(isOpen(p) && p.cat !== 'geçit') spots.push({p, dm});
+        if(sc < 2.6) dark.push(p.name);
+      }
+    });
+    spots.sort((a,b) => a.dm - b.dm);
+    return {light: w ? sum / w : 2.6, open: spots.length, dark, spots: spots.map(x => x.p)};
+  },
+  async find(){
+    if(!R.to){ toast('Varış eksik', 'Gitmek istediğin yeri yaz ya da haritadan seç.'); return; }
+    if(!R.from) R.from = R.here();
+    R.loading = true; R.note = ''; R.card();
+    if($('#sheet').classList.contains('on')) R.refresh();
+
+    let cands = [];
+    try {
+      cands = await osrm([R.from.ll, R.to.ll]);
+      // aydınlık ara noktalardan geçen ek seçenekler
+      const via = state.places
+        .filter(p => score(p) >= 3.5)
+        .map(p => ({p, d: dist(R.from.ll, p.ll) + dist(p.ll, R.to.ll) - dist(R.from.ll, R.to.ll)}))
+        .filter(x => x.d < 900)
+        .sort((a,b) => a.d - b.d).slice(0, 2);
+      const extra = await Promise.all(via.map(x =>
+        osrm([R.from.ll, x.p.ll, R.to.ll]).then(r => r[0]).catch(() => null)));
+      cands = cands.concat(extra.filter(Boolean));
+    } catch(e){
+      // servise ulaşılamadıysa düz çizgiye düş
+      const direct = {ll:[R.from.ll, R.to.ll], m: dist(R.from.ll, R.to.ll), sec: dist(R.from.ll, R.to.ll)/1.3};
+      const lit = state.places.filter(p => score(p) >= 3.5)
+        .map(p => ({p, d: dist(R.from.ll,p.ll)+dist(p.ll,R.to.ll)-direct.m}))
+        .filter(x => x.d < 700).sort((a,b)=>a.d-b.d)[0];
+      cands = [direct];
+      if(lit) cands.push({ll:[R.from.ll, lit.p.ll, R.to.ll], m: direct.m + lit.d, sec:(direct.m+lit.d)/1.3});
+      R.note = 'Yol servisine ulaşılamadı, rotalar kuş uçuşu çizildi. Mesafe ve süre yaklaşıktır.';
+    }
+
+    // tekrarları at
+    const seen = new Set();
+    cands = cands.filter(c => { const k = Math.round(c.m/25); if(seen.has(k)) return false; seen.add(k); return true; });
+
+    let opts = cands.map(c => ({...c, ...R.rate(c.ll), tags: []}));
+    opts = opts.slice(0, 4);
+    const verdict = await Brain.rank(opts);      // kural setini dil modeli üretir
+    R.why = verdict ? verdict.why : '';
+    R.src = verdict ? verdict.src : 'local';
+    R.w = verdict ? verdict.w : null;
+    R.options = opts;
+    R.sel = 0; R.loading = false;
+    S.raw(R.resultsHtml());
+    R.paint(); R.card();
+  },
+
+  /* ---------- çizim ---------- */
+  clearLines(){
+    R.lines.forEach(l => state.map.removeLayer(l)); R.lines = [];
+    R.marks.forEach(m => state.map.removeLayer(m)); R.marks = [];
+  },
+  paint(){
+    R.clearLines();
+    R.options.forEach((o,i) => {
+      const on = i === R.sel;
+      R.lines.push(L.polyline(o.ll, {
+        color: on ? '#ffc861' : '#6f66a3',
+        weight: on ? 6 : 3, opacity: on ? .95 : .45,
+        dashArray: on ? null : '4 8', lineCap:'round'
+      }).addTo(state.map));
+    });
+    if(R.lines[R.sel]) R.lines[R.sel].bringToFront();
+    const mk = (ll, cls, label) => {
+      const m = L.marker(ll, {icon: L.divIcon({className:'', iconSize:[16,16], iconAnchor:[8,8],
+        html:`<div class="dot ${cls}"></div>`})}).addTo(state.map);
+      m.bindTooltip(label, {direction:'top', offset:[0,-10]});
+      R.marks.push(m);
+    };
+    if(!R.from.me) mk(R.from.ll, 'start', R.from.name);
+    mk(R.to.ll, 'end', R.to.name);
+
+    // seçili rota üzerindeki açık noktalar
+    const sel = R.options[R.sel];
+    state.routeSpots = new Set((sel && sel.spots || []).map(p => p.id));
+    M.paint();
+    (sel && sel.spots || []).forEach(p => {
+      const m = L.marker(p.ll, {icon: L.divIcon({className:'', iconSize:[22,22], iconAnchor:[11,11],
+        html:'<div class="dot spot"></div>'}), zIndexOffset: 400}).addTo(state.map);
+      m.bindTooltip(`${p.name} · ${openTxt(p)} · ışık ${score(p).toFixed(1)}`,
+        {direction:'top', offset:[0,-13], className:'spotlab'});
+      m.on('click', () => S.place(p.id));
+      R.marks.push(m);
+    });
+
+    // yalnızca seçili rotaya yakınlaş, okunur bir zum düzeyinde kal
+    const box = L.latLngBounds(sel ? sel.ll : R.options.flatMap(o => o.ll));
+    if(box.isValid()) state.map.fitBounds(box, {padding:[45,55], maxZoom:17});
+  },
+  select(i){ R.sel = i; R.refresh(); R.paint(); },
+  fly(id){
+    const p = state.places.find(x => x.id === id);
+    if(!p) return;
+    U.go('map');
+    state.map.setView(p.ll, 17, {animate:true});
+    const mk = R.marks.find(m => Math.abs(m.getLatLng().lat - p.ll[0]) < 1e-9);
+    if(mk) mk.openTooltip();
+    document.querySelector('.mapcard').scrollIntoView({behavior:'smooth', block:'center'});
+  },
+  apply(){
+    S.close(); U.go('map'); R.card();
+    const card = document.querySelector('.mapcard');
+    card.classList.add('wide');
+    setTimeout(() => { state.map.invalidateSize(); R.paint(); }, 340);
+    setTimeout(() => card.scrollIntoView({behavior:'smooth', block:'center'}), 420);
+  },
+  clear(){
+    Nav2.stop();
+    R.clearLines(); R.options = []; R.to = null; R.qt = ''; R.note = '';
+    state.routeSpots = null; if(state.map) M.paint();
+    const d = $('#dest'); if(d) d.value = '';
+    const card = document.querySelector('.mapcard');
+    if(card){ card.classList.remove('wide'); setTimeout(() => state.map.invalidateSize(), 340); }
+    Nav.sync(); R.card();
+  },
+
+  /* ---------- harita ekranındaki rota kartı ---------- */
+  card(){
+    const el = $('#routeCard');
+    if(!el) return;
+    if(!R.to){ el.innerHTML = ''; return; }
+    if(!R.from) R.from = R.here();
+    const o = R.options[R.sel];
+    el.innerHTML = `
+      <div class="rline"><i style="background:#74e0b4"></i><em>Başlangıç</em><b>${esc(R.from.name)}</b></div>
+      <div class="rline"><i style="background:#9d6ff0"></i><em>Varış</em><b>${esc(R.to.name)}</b></div>
+      ${o ? `<div class="rmeta">
+          <span class="dur">${Math.max(1,Math.round(o.sec/60))} dk</span>
+          <span class="km">${(o.m/1000).toFixed(2)} km</span>
+          <span class="tag2">${esc(o.tags[0])}</span>
+        </div>` : ''}
+      ${o ? `<div style="display:flex;gap:8px;margin-top:2px">
+          <button class="btn btn-primary" style="flex:1.4" onclick="Nav2.start()">Rotayı başlat</button>
+          <button class="btn btn-ghost" style="flex:1" onclick="R.find()">Seçenekler</button>
+        </div>`
+        : `<button class="btn btn-primary" style="margin-top:12px" onclick="R.find()">
+            ${R.loading ? 'Rotalar hesaplanıyor…' : 'Güvenli rota oluştur'}</button>`}
+      ${o ? `<div class="rstats">
+          <span><b>%${Math.round(o.light/5*100)}</b> aydınlık</span>
+          <span><b>${o.open}</b> açık nokta</span>
+          <span>${o.dark.length ? `<b style="color:var(--signal)">${o.dark.length}</b> tenha nokta yakında` : 'tenha noktalar atlandı'}</span>
+        </div>` : ''}
+      ${o && o.spots && o.spots.length ? `<div class="spotlist">
+          <h5>Bu rota üzerinde şu an açık</h5>
+          ${o.spots.map(p => `<button class="spotrow" onclick="R.fly('${p.id}')">
+            <span class="g"></span>
+            <span class="n">${esc(p.name)}</span>
+            <span class="x">${esc(openTxt(p))} · ${score(p).toFixed(1)}</span></button>`).join('')}
+        </div>` : (o ? `<div class="spotlist"><h5>Bu rota üzerinde açık kayıtlı yer yok.</h5></div>` : '')}
+      ${o && o.spots.length ? `
+        <div class="spotlist">
+          <div class="sl-h">Rota üzerinde açık ${o.spots.length} yer</div>
+          ${o.spots.map(p => `<button class="sl-row" onclick="S.place('${p.id}')">
+            <i style="background:${color(score(p))}"></i>
+            <span style="flex:1;min-width:0">
+              <b>${esc(p.name)}</b>
+              <span>${esc(p.cat)} · ${openText(p)}</span>
+            </span>
+            <span class="sl-s" style="color:${color(score(p))}">${score(p).toFixed(1)}</span>
+          </button>`).join('')}
+        </div>` : (o ? '<div class="spotlist"><div class="sl-h" style="color:var(--signal)">Bu rotada şu saatte açık yer yok</div></div>' : '')}
+      ${o && R.why ? `<div style="font-size:12.5px;color:var(--halo);margin-top:10px">Dia: ${esc(R.why)}</div>` : ''}
+      ${state.mode === 'transit' ? `<div class="note" style="margin-top:11px">
+          Toplu taşıma tarifesi uygulamada yok. Rota, en yakın durağa kadar yürüyüş olarak hesaplandı.
+          <button class="btn-line" style="padding:8px 0 0" onclick="Nav2.transit()">Sefer saatleri için haritalarda aç</button>
+        </div>` : ''}
+      ${o && o.steps && o.steps.length ? `<div class="steps">
+          <div class="sl-h">Yol tarifi</div>
+          ${o.steps.slice(0,4).map(st => `<div class="step-i"><em>${st.m < 1000 ? Math.round(st.m) + ' m' : (st.m/1000).toFixed(1) + ' km'}</em><span>${esc(st.text)}</span></div>`).join('')}
+          ${o.steps.length > 4 ? `<button class="btn-line" style="padding:8px 0 0" onclick="Nav2.allSteps()">Tüm adımları gör (${o.steps.length})</button>` : ''}
+        </div>` : ''}
+      ${R.note ? `<p class="note" style="margin-top:11px">${esc(R.note)}</p>` : ''}
+      <button class="btn-line" style="margin:6px auto 0" onclick="R.clear()">Rotayı kapat</button>`;
+  }
+};
+
+
+/* ============================================================
+   ÜST ARAMA + KISAYOLLAR
+   ============================================================ */
+const Nav = {
+  t: null, res: {f: [], t: []},
+
+  /* alanları ekrandaki değerlerle eşitle */
+  sync(){
+    const f = $('#from'), d = $('#dest');
+    if(f && document.activeElement !== f) f.value = R.from ? R.from.name : '';
+    if(d && document.activeElement !== d) d.value = R.to ? R.to.name : '';
+  },
+  status(text, kind){
+    const el = $('#geoStatus'); if(!el) return;
+    el.className = kind || '';
+    el.innerHTML = text || '';
+  },
+  focusFrom(){ const f = $('#from'); if(f){ f.focus(); f.select(); } },
+
+  modes(){
+    const el = $('#modes'); if(!el) return;
+    el.innerHTML = MODES.map(m => `<button class="mode" aria-pressed="${state.mode === m.k}"
+      onclick="Nav.setMode('${m.k}')"><svg viewBox="0 0 24 24">${m.ic}</svg><b>${m.n}</b></button>`).join('');
+  },
+  setMode(k){
+    state.mode = k;
+    Nav.modes();
+    R.options = []; R.clearLines(); Nav2.stop();
+    R.card();
+    if(R.to) R.find();
+  },
+
+  type(which, v){
+    clearTimeout(Nav.t);
+    if(v.trim().length < 2){ Nav.res[which] = []; Nav.msg(which, ''); return Nav.render(which); }
+    Nav.msg(which, 'Aranıyor…');
+    Nav.t = setTimeout(() => Nav.run(which, v.trim()), 550);
+  },
+  msg(which, text, kind){
+    const el = $(which === 'f' ? '#fromRes' : '#destRes'); if(!el) return;
+    el.innerHTML = text
+      ? `<div style="padding:11px 13px;font-size:13px;color:${kind === 'warn' ? 'var(--signal)' : 'var(--muted)'}">${text}</div>`
+      : '';
+  },
+  enter(which, ev){
+    if(ev.key !== 'Enter') return;
+    ev.preventDefault();
+    const list = Nav.res[which] || [];
+    if(list.length) Nav.choose(which, 0);
+    else Nav.run(which, ev.target.value.trim());
+  },
+  async run(which, q){
+    const local = state.places
+      .filter(p => p.name.toLocaleLowerCase('tr').includes(q.toLocaleLowerCase('tr')))
+      .map(p => ({name:p.name, sub:`${p.cat} · ışık ${score(p).toFixed(1)}`, ll:p.ll}));
+    let web = [], failed = false, why = '';
+    try { web = (await geocode(q)).map(x => ({...x, sub: x.full.split(',').slice(2,5).join(',')})); }
+    catch(e){ failed = true; why = e.detail || ''; }
+    Nav.res[which] = [...local, ...web].slice(0, 6);
+    if(!Nav.res[which].length){
+      Nav.msg(which, failed
+        ? 'Adres servisine ulaşılamadı. Tekrar dene ya da haritadan nokta seç.'
+        : `“${esc(q)}” bulunamadı. İl adını da ekle (örn. “Kadıköy, İstanbul”) ya da haritadan nokta seç.`, 'warn');
+      return;
+    }
+    Nav.render(which);
+  },
+  render(which){
+    const el = $(which === 'f' ? '#fromRes' : '#destRes'); if(!el) return;
+    el.innerHTML = (Nav.res[which] || []).map((x,i) =>
+      `<button onclick="Nav.choose('${which}',${i})"><b>${esc(x.name)}</b><span>${esc(x.sub||'')}</span></button>`).join('');
+  },
+  choose(which, i){
+    const x = Nav.res[which][i];
+    Nav.res[which] = []; Nav.render(which);
+    R.options = []; R.note = ''; R.clearLines();
+    if(which === 'f'){
+      // başlangıç elle girildi: harita ve çevredeki yerler oraya taşınır
+      state.manualStart = true;
+      M.setCenter(x.ll, x.name);
+      Nav.status('Başlangıç noktan: ' + esc(x.name) + ' · konumun değiştiyse ◎ ile güncelle', 'ok');
+    } else {
+      R.to = {name:x.name, ll:x.ll}; R.qt = x.name;
+      if(!R.from) R.from = R.here();
+      state.map.setView(x.ll, 15);
+    }
+    Nav.sync();
+    const el = $(which === 'f' ? '#from' : '#dest'); if(el) el.blur();
+    R.card();
+  },
+  swap(){
+    if(!R.from || !R.to){ toast('Eksik alan', 'Değiştirmek için iki alanı da doldur.'); return; }
+    const a = R.from, b = R.to;
+    R.from = {name: b.name, ll: b.ll};
+    R.to   = {name: a.name, ll: a.ll};
+    R.options = []; R.clearLines();
+    M.setCenter(R.from.ll, R.from.name, true);
+    Nav.sync(); R.card();
+  },
+  pick(which){
+    S.close(); U.go('map');
+    $('#pickHint').classList.add('on');
+    $('#pickHint').textContent = which === 'f' ? 'Başlangıç noktasına dokun' : 'Varış noktasına dokun';
+    state.map.once('click', e => {
+      const ll = [e.latlng.lat, e.latlng.lng];
+      const near = state.places.find(p => dist(ll, p.ll) < 70);
+      const name = near ? near.name : 'Haritada seçilen nokta';
+      const pt = near ? near.ll : ll;
+      $('#pickHint').classList.remove('on');
+      R.options = []; R.clearLines();
+      if(which === 'f'){ state.manualStart = true; M.setCenter(pt, name); Nav.status('Başlangıç noktan: ' + esc(name), 'ok'); }
+      else { R.to = {name, ll: pt}; R.qt = name; if(!R.from) R.from = R.here(); }
+      Nav.sync(); R.card();
+    });
+  }
+};
+
+/* ---------- kayıtlı kısayollar: Ev / Okul-İş / Favori ---------- */
+const SHORTS = [
+  {k:'home', ic:'home', n:'Ev'},
+  {k:'work', ic:'work', n:'Okul/İş'},
+  {k:'fav',  ic:'star', n:'Favori'}
+];
+const Fav = {
+  all(){ return (state.user && state.user.saved) || {}; },
+  render(){
+    const el = $('#shorts'); if(!el) return;
+    const sv = Fav.all();
+    el.innerHTML = SHORTS.map(x => {
+      const has = sv[x.k];
+      return `<button class="short ${has ? 'set' : ''}" onclick="Fav.tap('${x.k}')">
+        <i><svg viewBox="0 0 24 24">${ICONS[x.ic]}</svg></i>
+        <span>${has ? esc(has.name.split(',')[0].slice(0,14)) : x.n}</span></button>`;
+    }).join('') + `<button class="short" onclick="Fav.tap('extra')">
+        <i><svg viewBox="0 0 24 24">${ICONS.plus}</svg></i><span>Ekle</span></button>`;
+  },
+  tap(k){
+    const sv = Fav.all();
+    if(k !== 'extra' && sv[k]){
+      R.to = {name: sv[k].name, ll: sv[k].ll}; R.qt = sv[k].name; R.options = [];
+      if(!R.from) R.from = R.here();
+      Nav.sync(); R.card(); R.find();
+      return;
+    }
+    Fav.edit(k === 'extra' ? 'fav' : k);
+  },
+  edit(k){
+    const label = k === 'home' ? 'Ev' : k === 'work' ? 'Okul veya iş' : 'Favori yer';
+    Fav.k = k; Fav.res = []; Fav.q = '';
+    S.raw(Fav.html(label));
+  },
+  html(label){
+    const sv = Fav.all()[Fav.k];
+    return `<h2>${esc(label)} adresi</h2>
+      <p style="color:var(--muted);margin:0 0 14px">Bir kez kaydet, sonra tek dokunuşla rota al.</p>
+      ${sv ? `<div class="note" style="margin-bottom:12px">Kayıtlı: ${esc(sv.name)}</div>` : ''}
+      <input id="favq" type="text" value="${esc(Fav.q||'')}" placeholder="Adres veya yer adı"
+             oninput="Fav.type(this.value)" autocomplete="off">
+      <div class="pickrow">
+        <button class="chip" onclick="Fav.useHere()">Şu anki konumum</button>
+        ${sv ? `<button class="chip" onclick="Fav.remove()">Kaydı sil</button>` : ''}
+      </div>
+      ${(Fav.res||[]).length ? `<div style="border:1px solid var(--ink-3);border-radius:12px;overflow:hidden;margin-top:8px">
+        ${Fav.res.map((x,i) => `<button onclick="Fav.save(${i})"
+          style="display:block;width:100%;text-align:left;padding:11px 13px;border-bottom:1px solid rgba(255,255,255,.06)">
+          <b style="font-size:14px">${esc(x.name)}</b>
+          <span style="display:block;font-size:12px;color:var(--muted)">${esc(x.sub||'')}</span></button>`).join('')}
+      </div>` : ''}`;
+  },
+  type(v){
+    Fav.q = v; clearTimeout(Fav.t);
+    if(v.trim().length < 3){ Fav.res = []; return; }
+    Fav.t = setTimeout(async () => {
+      try { Fav.res = (await geocode(v.trim())).map(x => ({...x, sub:x.full.split(',').slice(2,5).join(',')})); }
+      catch(e){ Fav.res = []; toast('Adres bulunamadı','İlçe ve il adını birlikte yaz ya da “Şu anki konumum”u kullan.'); }
+      const lbl = Fav.k === 'home' ? 'Ev' : Fav.k === 'work' ? 'Okul veya iş' : 'Favori yer';
+      $('#sheetBody').innerHTML = '<div class="grab"></div>' + Fav.html(lbl);
+      const el = document.getElementById('favq');
+      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    }, 600);
+  },
+  store(o){
+    if(!state.user) return;
+    state.user.saved = state.user.saved || {};
+    state.user.saved[Fav.k] = o;
+    saveUser(); Fav.render(); S.close();
+    toast('Kaydedildi', o.name + ' kısayollara eklendi.');
+  },
+  save(i){ Fav.store({name: Fav.res[i].name, ll: Fav.res[i].ll}); },
+  useHere(){ const h = R.here(); Fav.store({name:'Kaydedilen konum', ll:h.ll}); },
+  remove(){
+    if(state.user && state.user.saved){ delete state.user.saved[Fav.k]; saveUser(); }
+    Fav.render(); S.close(); toast('Silindi','Kısayol kaldırıldı.');
+  }
+};
+
+/* ============================================================
+   BENİMLE YÜRÜ
+   ============================================================ */
+const DEF_PEOPLE = [
+  {n:'Annem', c:'#9d6ff0'},
+  {n:'Selen (oda arkadaşı)', c:'#6a5ae0'},
+  {n:'Kampüs temsilcisi', c:'#3f9e78'}
+];
+const W = {
+  people(){ return (state.user && state.user.people) || DEF_PEOPLE; },
+  open(){
+    S.raw(`<h2>Kiminle yürüyelim?</h2>
+      <p style="color:var(--muted);margin:0 0 6px">Canlı konumun yalnızca seçtiğin kişiyle paylaşılır. Yabancılar göremez.</p>
+      <div style="margin-top:12px">
+        ${W.people().map((p,i) => `<button class="person" onclick="W.pick(${i})">
+          <span class="av" style="background:${p.c}">${esc(p.n.slice(0,2).toLocaleUpperCase('tr'))}</span>
+          <span class="nm">${esc(p.n)}</span><span class="pick">Seç</span></button>`).join('')}
+      </div>
+      <input id="newp" type="text" placeholder="Yeni kişi adı" style="margin-top:16px">
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="W.add()">Kişi ekle</button>
+      <p class="note" style="margin-top:14px">Bu sürümde konum sunucuya gönderilmiyor. “Seç” dediğinde
+        konumunu ve varış noktanı içeren bir mesaj hazırlanır; onu WhatsApp, SMS ya da istediğin
+        uygulamadan paylaşırsın.</p>`);
+  },
+  add(){
+    const v = ($('#newp').value || '').trim();
+    if(!v) return;
+    const list = W.people().slice();
+    list.push({n:v, c:'#6a5ae0'});
+    if(state.user){ state.user.people = list; saveUser(); }
+    W.open();
+  },
+  async pick(i){
+    const p = W.people()[i];
+    const h = R.here();
+    const link = `https://www.google.com/maps?q=${h.ll[0].toFixed(5)},${h.ll[1].toFixed(5)}`;
+    const text = `${p.n}, DIANA ile yürüyorum.${R.to ? ' Varış: ' + R.to.name + '.' : ''} Konumum: ${link}`;
+    state.walk = {who: p.n, since: Date.now()};
+    W.bar(); S.close();
+    try {
+      if(navigator.share) await navigator.share({title:'DIANA', text});
+      else { await navigator.clipboard.writeText(text); toast('Mesaj kopyalandı', p.n + '’e yapıştırıp gönderebilirsin.'); }
+    } catch(e){ /* paylaşımdan vazgeçildi */ }
+  },
+  bar(){
+    const el = $('#walkBar'); if(!el) return;
+    if(!state.walk){ el.classList.remove('on'); el.innerHTML = ''; return; }
+    el.classList.add('on');
+    el.innerHTML = `<span><span class="t">${esc(state.walk.who)} seninle yürüyor</span>
+      <span class="s">Başlangıç ${new Date(state.walk.since).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</span></span>
+      <button onclick="W.stop()">Bitir</button>`;
+  },
+  stop(){
+    const who = state.walk && state.walk.who;
+    state.walk = null; W.bar();
+    toast('Yürüyüş bitti', who ? who + ' ile paylaşım kapandı.' : '');
+  }
+};
+
+/* ============================================================
+   SOKAĞI DEĞERLENDİR
+   ============================================================ */
+const ST_CRIT = [['Aydınlatma','Sokak ve giriş ne kadar ışıklı'],
+                 ['İnsan yoğunluğu','Çevrede insan var mı'],
+                 ['Görüş açıklığı','Önünü ve arkanı görebiliyor musun']];
+const St = {
+  v: [3,3,3],
+  open(){
+    St.v = [3,3,3];
+    const near = St.nearest();
+    S.raw(`<h2>Şu an bulunduğun sokak</h2>
+      <p style="color:var(--muted);margin:0 0 4px">30 saniyelik değerlendirmen haritayı herkes için keskinleştirir.</p>
+      ${near ? `<div class="note" style="margin-top:12px">Yakınında <b style="color:var(--paper)">${esc(near.name)}</b> var,
+        puanın oraya işlenecek.</div>` : `<div class="note" style="margin-top:12px">Burada kayıtlı yer yok — konumun yeni bir sokak kaydı olarak eklenecek.</div>`}
+      ${ST_CRIT.map((c,i) => `<div class="slider">
+        <div class="top"><span>${c[0]}<small style="display:block;color:var(--muted);font-size:12px">${c[1]}</small></span>
+          <b id="sv${i}">3/5</b></div>
+        <input type="range" min="1" max="5" step="1" value="3" oninput="St.set(${i},this.value)">
+      </div>`).join('')}
+      <textarea id="stc" rows="2" placeholder="Eklemek istediğin bir şey var mı? (isteğe bağlı)" style="margin-top:14px"></textarea>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="St.submit()">Gönder · +15 ışık</button>`);
+  },
+  set(i, v){ St.v[i] = +v; $('#sv' + i).textContent = v + '/5'; },
+  nearest(){
+    const h = R.here();
+    let best = null;
+    state.places.forEach(p => { const d = dist(h.ll, p.ll); if(d < 80 && (!best || d < best.d)) best = {...p, d}; });
+    return best;
+  },
+  submit(){
+    if(!state.user){ toast('Giriş gerekiyor','Değerlendirme için hesabına gir.'); return; }
+    const h = R.here(), c = ($('#stc').value || '').trim();
+    const [light, crowd, view] = St.v;
+    const staff = Math.round((light + crowd + view) / 3);
+    const v = [light, staff, crowd, view];
+    const ts = Date.now(), hh = new Date().getHours();
+    let target = St.nearest();
+    if(target){
+      const p = state.places.find(x => x.id === target.id);
+      p.r.unshift({u: state.user.name || 'Sen', v, c, d:0, mine:true, ts});
+      state.user.reviews = state.user.reviews || [];
+      state.user.reviews.push({pid:p.id, cat:p.cat, v, c, ts, h:hh});
+    } else {
+      const id = 'u' + ts;
+      const name = 'Sokak · ' + new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+      const rec = {id, name, cat:'geçit', ll:h.ll, note:'Kullanıcı değerlendirmesi', h:'24',
+                   r:[{u: state.user.name || 'Sen', v, c, d:0, mine:true, ts}]};
+      state.places.push(rec);
+      state.user.streets = state.user.streets || [];
+      state.user.streets.push({id, name, ll:h.ll, note:rec.note, v, c, ts});
+      state.user.reviews = state.user.reviews || [];
+      state.user.reviews.push({pid:id, cat:'geçit', v, c, ts, h:hh});
+    }
+    saveUser();
+    addPoints(15, 'Sokak değerlendirmen kaydedildi.');
+    checkBadges(); M.paint(); Lst.render(); S.close();
+  }
+};
+
+
+/* ============================================================
+   NAVİGASYON — adım adım yönlendirme
+   ============================================================ */
+const Nav2 = {
+  watch: null, wake: null, i: 0, done: 0,
+
+  start(){
+    const o = R.options[R.sel];
+    if(!o){ toast('Önce rota oluştur', 'Varış noktası seçip rotayı hesapla.'); return; }
+    if(!o.steps || !o.steps.length){
+      toast('Adım adım tarif yok', 'Bu rota kuş uçuşu hesaplandı, yönlendirme verilemiyor.');
+      return;
+    }
+    Nav2.i = 0; Nav2.done = 0;
+    state.nav = {o, since: Date.now()};
+    document.querySelector('.mapcard').classList.add('wide');
+    U.go('map');
+    setTimeout(() => { state.map.invalidateSize(); R.paint(); Nav2.recenter(); }, 320);
+    Nav2.render();
+    Nav2.follow();
+    Nav2.keepAwake();
+    toast('Rota başladı', 'Uygulamayı açık tut, adımlar konumunla ilerleyecek.');
+  },
+
+  async keepAwake(){
+    try { if('wakeLock' in navigator) Nav2.wake = await navigator.wakeLock.request('screen'); }
+    catch(e){ /* desteklenmiyor */ }
+  },
+
+  follow(){
+    if(!navigator.geolocation) return;
+    Nav2.watch = navigator.geolocation.watchPosition(pos => {
+      const ll = [pos.coords.latitude, pos.coords.longitude];
+      state.center = ll;
+      M.me(ll, true);
+      const st = state.nav && state.nav.o.steps[Nav2.i];
+      if(st && dist(ll, st.ll) < 28){       // adım tamamlandı
+        Nav2.done += st.m;
+        if(Nav2.i < state.nav.o.steps.length - 1){ Nav2.i++; }
+        else return Nav2.arrive();
+      }
+      Nav2.render(ll);
+      if(Nav2.followCam !== false) state.map.panTo(ll, {animate:true, duration:.6});
+    }, () => {}, {enableHighAccuracy:true, maximumAge:2000, timeout:15000});
+  },
+
+  render(ll){
+    const p = $('#navPanel'); if(!p) return;
+    if(!state.nav){ p.classList.remove('on'); p.innerHTML = ''; return; }
+    const steps = state.nav.o.steps, st = steps[Nav2.i], nx = steps[Nx()];
+    function Nx(){ return Math.min(Nav2.i + 1, steps.length - 1); }
+    const toStep = ll && st.ll ? dist(ll, st.ll) : st.m;
+    const left = Math.max(0, state.nav.o.m - Nav2.done);
+    const mins = Math.max(1, Math.round(left / (state.nav.o.m / state.nav.o.sec) / 60));
+    p.classList.add('on');
+    const ch = $('#mapChips'); if(ch) ch.style.display = 'none';
+    p.innerHTML = `
+      <div class="now">
+        <span class="arw">${Nav2.i === steps.length - 1 ? '⚑' : '↑'}</span>
+        <span style="flex:1;min-width:0">
+          <div class="ins">${esc(st.text)}</div>
+          <div class="dist">${toStep < 1000 ? Math.round(toStep) + ' m sonra' : (toStep/1000).toFixed(1) + ' km sonra'}
+            · kalan ${left < 1000 ? Math.round(left) + ' m' : (left/1000).toFixed(1) + ' km'} · ${mins} dk</div>
+        </span>
+      </div>
+      ${nx && nx !== st ? `<div class="nxt">Sonra: ${esc(nx.text)}</div>` : ''}
+      <div class="foot">
+        <button class="btn-ghost" onclick="Nav2.recenter()">Ortala</button>
+        <button class="btn-ghost" onclick="Nav2.allSteps()">Adımlar</button>
+        <button class="sos" onclick="Nav2.sos()">Acil</button>
+        <button class="btn-primary" onclick="Nav2.stop()">Bitir</button>
+      </div>`;
+  },
+
+  recenter(){
+    Nav2.followCam = true;
+    const ll = state.meMarker ? state.meMarker.getLatLng() : null;
+    if(ll) state.map.setView(ll, 17);
+  },
+
+  allSteps(){
+    const o = state.nav ? state.nav.o : R.options[R.sel];
+    if(!o || !o.steps) return;
+    S.raw(`<h2>Yol tarifi</h2>
+      <p style="color:var(--muted);margin:0 0 6px">${esc(R.from.name)} → ${esc(R.to.name)} ·
+        ${(o.m/1000).toFixed(2)} km · ${Math.max(1,Math.round(o.sec/60))} dk</p>
+      <div class="steps">${o.steps.map((st,i) => `<div class="step-i" style="${i === Nav2.i && state.nav ? 'color:var(--halo)' : ''}">
+        <em>${st.m < 1000 ? Math.round(st.m) + ' m' : (st.m/1000).toFixed(1) + ' km'}</em>
+        <span>${esc(st.text)}</span></div>`).join('')}</div>`);
+  },
+
+  sos(){
+    const h = R.here();
+    const near = [...state.places].filter(p => isOpen(p) && p.cat !== 'geçit')
+      .sort((a,b) => dist(h.ll,a.ll) - dist(h.ll,b.ll))[0];
+    S.raw(`<h2 style="color:var(--signal)">Acil durum</h2>
+      <p style="color:var(--muted);margin:0 0 14px">Tehlikedeysen önce 112'yi ara. Polis 155.</p>
+      <a class="btn btn-primary" href="tel:112" style="display:block;text-decoration:none">112'yi ara</a>
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="S.close();W.open()">Konumumu birine gönder</button>
+      ${near ? `<div class="note" style="margin-top:14px">En yakın açık yer: <b style="color:var(--paper)">${esc(near.name)}</b>
+        · ${walk(dist(h.ll, near.ll))} · ${openText(near)}</div>` : ''}`);
+  },
+
+  transit(){
+    const f = R.from && R.from.ll, t = R.to && R.to.ll;
+    if(!f || !t){ toast('Eksik alan', 'Başlangıç ve varış gerekiyor.'); return; }
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${f[0]},${f[1]}&destination=${t[0]},${t[1]}&travelmode=transit`;
+    window.open(url, '_blank', 'noopener');
+  },
+
+  arrive(){
+    toast('Vardın', R.to ? R.to.name + ' — güvenle ulaştın.' : 'Varış noktasına ulaştın.');
+    if(state.walk) W.stop();
+    Nav2.stop();
+  },
+
+  stop(){
+    if(Nav2.watch != null){ navigator.geolocation.clearWatch(Nav2.watch); Nav2.watch = null; }
+    if(Nav2.wake){ try { Nav2.wake.release(); } catch(e){} Nav2.wake = null; }
+    state.nav = null;
+    const p = $('#navPanel'); if(p){ p.classList.remove('on'); p.innerHTML = ''; }
+    const ch = $('#mapChips'); if(ch) ch.style.display = '';
+  }
+};
+
+/* ============================================================
+   LİSTE
+   ============================================================ */
+const Lst = {
+  filter(c){ M.filter(c); },
+  render(){
+    const q = ($('#q').value || '').toLocaleLowerCase('tr');
+    const rows = state.places
+      .filter(p => state.filter === 'hepsi' || p.cat === state.filter)
+      .filter(p => !q || (p.name + ' ' + p.cat + ' ' + p.note).toLocaleLowerCase('tr').includes(q))
+      .sort((a,b) => score(b) - score(a));
+    if(!rows.length){
+      $('#listBody').innerHTML = `<div class="empty"><b>Burada henüz ışık yok</b>
+        Aradığın yer listede değilse ilk değerlendirmeyi sen yazabilirsin.</div>`;
+      return;
+    }
+    $('#listBody').innerHTML = rows.map(p => {
+      const s = score(p), col = color(s), d = dist(state.center, p.ll);
+      return `<button class="place" onclick="S.place('${p.id}')">
+        <span class="ring" style="border:2px solid ${col};color:${col};box-shadow:0 0 14px ${col}33">${s.toFixed(1)}</span>
+        <span style="flex:1;min-width:0">
+          <h3>${esc(p.name)}</h3>
+          <span class="meta"><span class="pill">${esc(p.cat)}</span>${walk(d)} · ${p.r.length} değerlendirme</span>
+          <span class="meta" style="display:block;margin-top:6px;color:#c9c1f0">${esc(p.note)}</span>
+        </span></button>`;
+    }).join('');
+  }
+};
+
+
+/* ============================================================
+   ALT SAYFA: YER DETAYI + PUANLAMA
+   ============================================================ */
+const CRIT = [
+  ['Aydınlatma', 'Sokak ve giriş ne kadar ışıklı'],
+  ['Personel tutumu', 'Yardım isteyince ne oluyor'],
+  ['Canlılık', 'Çevrede insan var mı'],
+  ['Giriş ve çıkış', 'Kolay girip kolay çıkabiliyor musun']
+];
+const S = {
+  draft: [0,0,0,0],
+  raw(html){ $('#sheetBody').innerHTML = `<div class="grab"></div>` + html; $('#sheet').classList.add('on'); },
+  close(){ if(window.Verify) Verify.stop(); $('#sheet').classList.remove('on'); },
+  place(id){
+    const p = state.places.find(x => x.id === id);
+    const s = score(p), col = color(s), d = dist(state.center, p.ll);
+    const crit = CRIT.map((c,i) => {
+      const v = p.r.length ? avg(p.r.map(r => r.v[i])) : 0;
+      return `<div class="rate-row"><span class="lbl">${c[0]}</span>
+        <span>${lamps(v)} <b style="font-size:13px;margin-left:6px;color:${color(v)}">${v.toFixed(1)}</b></span></div>`;
+    }).join('');
+    S.raw(`
+      <div class="row-between" style="align-items:flex-start">
+        <div><h2>${esc(p.name)}</h2>
+          <div style="color:var(--muted);font-size:13px"><span class="pill">${esc(p.cat)}</span>${walk(d)}</div></div>
+        <div class="ring" style="border:2px solid ${col};color:${col};width:56px;height:56px;font-size:17px">${s.toFixed(1)}</div>
+      </div>
+      <p style="color:#cfc7f5;font-size:14px;margin:12px 0 0">${esc(p.note)}</p>
+      <div style="display:flex;gap:8px;margin:16px 0 4px">
+        <button class="btn btn-primary" style="flex:1" onclick="M.route('${p.id}')">Buraya rota</button>
+        <button class="btn btn-ghost" style="flex:0 0 46%" onclick="S.share('${p.id}')">Paylaş</button>
+      </div>
+      <h3>Ölçütler</h3>${crit}
+      <h3>Sen ne dersin</h3>
+      ${CRIT.map((c,i)=>`<div class="rate-row">
+          <span class="lbl">${c[0]}<small>${c[1]}</small></span>
+          <span class="picker" id="pk${i}">${[1,2,3,4,5].map(v=>`<button type="button" onclick="S.pick(${i},${v})" aria-label="${v}"></button>`).join('')}</span>
+        </div>`).join('')}
+      <textarea id="rc" rows="3" placeholder="Ne gördün? Saat kaçtaydı? (isteğe bağlı)" style="margin-top:12px"></textarea>
+      <button class="btn btn-primary" style="margin-top:12px" onclick="S.submit('${p.id}')">Değerlendirmeyi gönder</button>
+      <p class="err" id="rErr"></p>
+      <h3>Değerlendirmeler (${p.r.length})</h3>
+      ${p.r.map(r => `<div class="review">
+          <div class="who">${esc(r.u)} · ${ago(r.d)} · ${lamps(avg(r.v))}</div>
+          ${r.c ? `<p>${esc(r.c)}</p>` : ''}</div>`).join('') || '<p style="color:var(--muted)">Henüz kimse yazmadı. İlk sen ol.</p>'}
+    `);
+    S.draft = [0,0,0,0];
+  },
+  pick(i, v){
+    S.draft[i] = v;
+    const btns = $('#pk' + i).children;
+    for(let k = 0; k < 5; k++) btns[k].classList.toggle('on', k < v);
+  },
+  submit(id){
+    if(!state.user){ $('#rErr').textContent = 'Değerlendirme için giriş yapmalısın.'; return; }
+    const filled = S.draft.filter(Boolean).length;
+    if(filled === 0){ $('#rErr').textContent = 'En az bir ölçütü işaretle.'; return; }
+    const v = S.draft.map(x => x || Math.round(avg(S.draft.filter(Boolean))));
+    const p = state.places.find(x => x.id === id);
+    const c = ($('#rc').value || '').trim();
+    const ts = Date.now(), h = new Date().getHours();
+    p.r.unshift({u: state.user.name || 'Sen', v, c, d: 0, mine: true, ts});
+    state.user.reviews = state.user.reviews || [];
+    state.user.reviews.push({pid: id, cat: p.cat, v, c, ts, h});
+    saveUser();
+    addPoints(25, 'Değerlendirmen yayında.');
+    if(filled === 4) addPoints(10, 'Dört ölçütü de doldurdun.');
+    checkBadges(); M.paint(); Lst.render();
+    S.close();
+  },
+  async share(id){
+    const p = state.places.find(x => x.id === id);
+    const text = `${p.name} — DIANA ışık puanı ${score(p).toFixed(1)}/5`;
+    const url = location.href;
+    try {
+      if(navigator.share) await navigator.share({title:'DIANA', text, url});
+      else { await navigator.clipboard.writeText(text + ' ' + url); toast('Bağlantı kopyalandı', text); }
+      addPoints(5, 'Bir yeri paylaştın.'); grant('yol_arkadasi');
+    } catch(e){ /* kullanıcı vazgeçti */ }
+  }
+};
+
+/* ============================================================
+   ROZETLER
+   ============================================================ */
+const B = {
+  render(){
+    if(!state.user) return;
+    const pts = state.user.points || 0, got = state.user.badges || [];
+    const {cur, next} = levelOf(pts);
+    $('#lvName').textContent = cur.n;
+    $('#lvNext').textContent = next ? `${next.p - pts} ışık sonra ${next.n}` : 'En üst seviyedesin.';
+    $('#lvBar').style.width = (next ? Math.min(100, ((pts - cur.p) / (next.p - cur.p)) * 100) : 100) + '%';
+    $('#badgeCount').textContent = `${got.length} / ${BADGES.length} kazanıldı · ${pts} ışık`;
+    $('#badgeGrid').innerHTML = BADGES.map(b => `
+      <div class="badge ${got.includes(b.id) ? 'got' : ''}">
+        <div class="gl">${b.g}</div><h4>${b.n}</h4><p>${b.d}</p></div>`).join('');
+  }
+};
+
+/* ============================================================
+   PROFİL
+   ============================================================ */
+const Me = {
+  render(){
+    if(!state.user) return;
+    const u = state.user, pl = u.plan;
+    const planLine = isPremium()
+      ? `${esc(pl.label)} · ${new Date(pl.until).toLocaleDateString('tr-TR',{day:'numeric',month:'long'})} tarihine kadar`
+      : 'Ücretsiz kullanım';
+    $('#meBody').innerHTML = `
+      <div class="level-card">
+        <div style="font-family:var(--font-d);font-size:24px;font-weight:800">${esc(u.name || 'Misafir')}</div>
+        <div style="color:var(--muted);font-size:13px;margin-top:2px">${esc(u.guest ? 'Misafir oturumu' : u.email)}</div>
+        <div style="margin-top:14px;font-size:14px">${planLine}</div>
+      </div>
+      <div style="display:flex;gap:10px;margin:16px 0">
+        <div style="flex:1" class="note"><b style="color:var(--halo);font-size:19px;font-family:var(--font-d)">${u.points||0}</b><br>ışık</div>
+        <div style="flex:1" class="note"><b style="color:var(--halo);font-size:19px;font-family:var(--font-d)">${(u.reviews||[]).length}</b><br>değerlendirme</div>
+        <div style="flex:1" class="note"><b style="color:var(--halo);font-size:19px;font-family:var(--font-d)">${(u.badges||[]).length}</b><br>rozet</div>
+      </div>
+      <button class="btn btn-primary" onclick="P.open()">${isPremium() ? 'Paketi yönet' : 'Premium paketleri gör'}</button>
+      ${Install.can() ? '<button class="btn btn-ghost" style="margin-top:10px" onclick="Install.run()">Ana ekrana ekle</button>' : ''}
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="Prefs.open()">Rota tercihlerim</button>
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="M.locate()">Konumumu yenile</button>
+      <hr class="sep">
+      <div class="note">Değerlendirmeler ve rozetler bu cihazda saklanır${store.persistent ? '' : ' (bu önizlemede yalnızca oturum boyunca)'}.
+        Harita verisi OpenStreetMap ve CARTO’dan gelir. Yerler örnek veridir.</div>
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="Me.reset()">Demo verilerini sıfırla</button>
+      <button class="btn-line" style="margin:8px auto 0" onclick="Me.out()">Çıkış yap</button>`;
+  },
+  reset(){
+    store.del('diana.users'); store.del('diana.session');
+    location.reload();
+  },
+  out(){
+    Auth.logout(); state.user = null; state.chat = [];
+    $('#app').classList.remove('on'); $('#auth').style.display = 'flex';
+    $('#iPass').value = ''; A.list();
+  }
+};
+
+/* ============================================================
+   REKLAM BANDI
+   ============================================================ */
+/* Reklam yuvası — dış reklam verenler için.
+   AD_SLOT.items içine kendi reklamlarını ekle; her yenilemede rastgele biri gösterilir.
+   Diziyi boşaltırsan yuva "Reklam alanı" yazısıyla boş durur, düzen kaymaz.
+   Bir reklam ağı kullanacaksan (AdSense vb.) Ad.render() içindeki innerHTML yerine
+   ağın verdiği script etiketini bas; yuvanın ölçüsü 320x56'ya yakındır. */
+const AD_SLOT = {
+  items: [
+    {t:'Kampüs Kırtasiye', s:'Öğrenciye %20 indirim · Bahar Sok. No 4', c:'Git', u:''},
+    {t:'GO Taksi', s:'Kadın sürücü seçeneğiyle çağır', c:'Aç', u:''},
+    {t:'Filiz Spor Salonu', s:'Gece 23.00’a kadar açık · ilk ders ücretsiz', c:'Bak', u:''},
+    {t:'Mor Fırın', s:'Sabah 05.00’ten beri sıcak ekmek', c:'Gör', u:''}
+  ]
+};
+const Ad = {
+  cur: null, timer: null, off: false,
+  start(){
+    Ad.roll(); clearInterval(Ad.timer);
+    Ad.timer = setInterval(() => Ad.roll(), 12000);
+  },
+  roll(){
+    const list = AD_SLOT.items;
+    if(list.length > 1){
+      let next; do { next = list[Math.floor(Math.random() * list.length)]; } while(next === Ad.cur);
+      Ad.cur = next;
+    } else Ad.cur = list[0] || null;
+    Ad.render();
+  },
+  render(){
+    const bar = $('#adbar');
+    if(!bar) return;
+    if(Ad.off || isPremium()){ bar.hidden = true; return; }
+    bar.hidden = false;
+    const a = Ad.cur;
+    if(!a){
+      bar.innerHTML = `<span class="ad-k">reklam</span>
+        <span style="flex:1;text-align:center;color:#6f66a3;font-size:12.5px">Reklam alanı</span>
+        <button class="ad-x" onclick="Ad.hide()" aria-label="Kapat">×</button>`;
+      return;
+    }
+    bar.innerHTML = `<span class="ad-k">reklam</span>
+      <span style="min-width:0"><span class="ad-t">${esc(a.t)}</span><span class="ad-s">${esc(a.s)}</span></span>
+      ${a.u ? `<a class="ad-cta" href="${esc(a.u)}" target="_blank" rel="noopener noreferrer">${esc(a.c || 'Git')}</a>`
+            : `<button class="ad-cta" onclick="toast('Demo reklam','Bu yuva dış reklam verenler için ayrıldı.')">${esc(a.c || 'Git')}</button>`}
+      <button class="ad-x" onclick="Ad.hide()" aria-label="Kapat">×</button>`;
+  },
+  hide(){
+    Ad.off = true; clearInterval(Ad.timer); $('#adbar').hidden = true;
+    toast('Reklam kapatıldı', 'Bu oturum boyunca gizli kalacak.');
+  }
+};
+
+
+/* ============================================================
+   LLM KATMANI — DIA'nın dinamik yapay zekâsı
+   Tek giriş noktası. API anahtarı hiçbir zaman istemcide durmaz: istek
+   sunucudaki /api/dia (OpenAI proxy) fonksiyonuna gider. Sunucu yoksa ya da
+   yanıt boşsa çağıran taraf kendi çevrimdışı yanıtına düşer.
+   ============================================================ */
+async function llm({system, messages, max_tokens = 800, mode = 'chat'}){
+  const body = {max_tokens, system, messages, mode};
+  const read = d => {
+    if(!d) return '';
+    if(typeof d.text === 'string' && d.text) return d.text.trim();
+    if(Array.isArray(d.content)) return d.content.map(x => x.type === 'text' ? x.text : '').join('').trim();
+    if(d.choices && d.choices[0]) return ((d.choices[0].message || {}).content || '').trim();
+    return '';
+  };
+  // Aynı origin fonksiyon yolları (yönlendirme varsa /api/dia, yoksa doğrudan fonksiyon)
+  const endpoints = ['/api/dia', '/.netlify/functions/dia'];
+  let lastErr;
+  for(const url of endpoints){
+    try {
+      const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+      if(r.status === 404){ continue; }              // bu yolda fonksiyon yok, diğerini dene
+      const out = read(await r.json());
+      if(r.ok && out) return out;
+      lastErr = new Error('dia ' + r.status);         // 5xx (ör. anahtar yok) → çevrimdışına düş
+    } catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('llm');
+}
+
+/* ============================================================
+   ROTA KURAL MOTORU
+   Dil modeli rotayı ÇİZMEZ. Yolu OSRM çizer, ölçümleri uygulama yapar.
+   Modelin tek işi, kullanıcının tercihleri ve o anki koşullara göre
+   ağırlıkları (kural setini) üretip bir rota önermektir. Çıktısı
+   şemaya göre doğrulanır ve sınırlanır; doğrulamayı geçemezse
+   deterministik kurallara düşülür.
+   ============================================================ */
+const PREFS = [
+  {k:'isik',   n:'Aydınlatma her şeyden önemli'},
+  {k:'kalabalik', n:'Kalabalık caddeleri tercih ederim'},
+  {k:'sure',   n:'Sürem kısıtlı, hızlı olsun'},
+  {k:'aciksokak', n:'Ara sokak ve geçitlerden kaçın'},
+  {k:'mekan',  n:'Açık mekanların yakınından geçeyim'}
+];
+const BASE_W = {sure:.25, isik:.35, mekan:.20, tenha:.20};
+
+const Brain = {
+  on(){ const p = state.user && state.user.prefs; return !p || p.llm !== false; },
+  prefs(){ return (state.user && state.user.prefs) || {}; },
+
+  /* modele giden paket: kimlik yok, kişi listesi yok, tam koordinat yok */
+  payload(opts){
+    const p = Brain.prefs();
+    return {
+      saat: new Date().getHours(),
+      kullanici_tercihleri: PREFS.filter(x => p[x.k]).map(x => x.n),
+      serbest_not: String(p.note || '').slice(0, 200),
+      rotalar: opts.map((o,i) => ({
+        no: i,
+        dakika: Math.max(1, Math.round(o.sec/60)),
+        metre: Math.round(o.m),
+        isik_puani: +o.light.toFixed(2),          // 1-5
+        acik_mekan: o.open,
+        tenha_nokta: o.dark.length
+      }))
+    };
+  },
+  system(){
+    return `Sen bir yaya rota değerlendirme motorusun. Rota ÇİZMEZSİN, mesafe veya süre UYDURMAZSIN;
+sadece sana verilen ölçülmüş rotaları karşılaştırıp bir kural seti üretirsin.
+
+Girdi JSON olarak gelir: saat, kullanıcının tercihleri, serbest notu ve her rotanın
+dakika / metre / isik_puani (1-5) / acik_mekan sayısı / tenha_nokta sayısı değerleri.
+
+YALNIZCA şu JSON'u döndür, başka hiçbir metin yazma, kod bloğu kullanma:
+{"agirlik":{"sure":0.0,"isik":0.0,"mekan":0.0,"tenha":0.0},"oneri":0,"gerekce":"tek cümle"}
+
+Kurallar:
+- Dört ağırlık 0 ile 1 arasında olacak ve toplamı 1 olacak.
+- "sure" hızı, "isik" aydınlatmayı, "mekan" yol üstündeki açık yerleri,
+  "tenha" ise tenha noktalardan kaçınmayı temsil eder.
+- Gece 21.00 ile 06.00 arasında güvenlik ağırlıklarını (isik, mekan, tenha) belirgin şekilde artır.
+- Kullanıcı hızı açıkça istemişse bile "isik" ağırlığını 0.15'in altına düşürme.
+- "oneri" alanına önerdiğin rotanın numarasını yaz; numara verilen rotalardan biri olmalı.
+- "gerekce" tek cümle, Türkçe, en fazla 15 kelime, sayı uydurmadan.`;
+  },
+
+  /* deterministik yedek: model yoksa ya da çıktısı şemayı geçmezse */
+  fallbackW(){
+    const p = Brain.prefs(), h = new Date().getHours(), gece = h >= 21 || h < 6;
+    const w = {...BASE_W};
+    if(gece){ w.isik += .10; w.tenha += .05; w.sure -= .15; }
+    if(p.isik){ w.isik += .12; w.sure -= .12; }
+    if(p.sure){ w.sure += .15; w.isik -= .08; w.mekan -= .07; }
+    if(p.kalabalik){ w.mekan += .08; w.tenha += .04; w.sure -= .12; }
+    if(p.aciksokak){ w.tenha += .12; w.sure -= .12; }
+    if(p.mekan){ w.mekan += .12; w.sure -= .12; }
+    return Brain.clean(w);
+  },
+  clean(w){
+    const out = {};
+    ['sure','isik','mekan','tenha'].forEach(k => {
+      const v = Number(w && w[k]);
+      out[k] = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0;
+    });
+    out.isik = Math.max(out.isik, 0.15);                 // güvenlik tabanı
+    const t = out.sure + out.isik + out.mekan + out.tenha;
+    if(!t) return {...BASE_W};
+    ['sure','isik','mekan','tenha'].forEach(k => out[k] = out[k] / t);
+    return out;
+  },
+
+  /* ağırlıkları uygula, sırala, etiketle */
+  apply(opts, w, sug, why, src){
+    const span = (f) => { const v = opts.map(f); const mn = Math.min(...v), mx = Math.max(...v);
+                          return x => mx === mn ? 1 : (f(x) - mn) / (mx - mn); };
+    const nHiz  = span(o => -o.sec);
+    const nIsik = span(o => o.light);
+    const nMek  = span(o => o.open);
+    const nTenha= span(o => -o.dark.length);
+    opts.forEach(o => {
+      o.fit = w.sure*nHiz(o) + w.isik*nIsik(o) + w.mekan*nMek(o) + w.tenha*nTenha(o);
+      o.tags = [];
+    });
+    const best = f => opts.reduce((a,b) => f(b) > f(a) ? b : a);
+    best(o => -o.sec).tags.push('En hızlı');
+    best(o => o.light).tags.push('En güvenli');
+    best(o => o.open).tags.push('En çok açık mekan');
+    const pick = (Number.isInteger(sug) && opts[sug]) ? opts[sug] : best(o => o.fit);
+    pick.tags.unshift(src === 'llm' ? 'Dia’nın önerisi' : 'Sana uygun');
+    opts.forEach((o,i) => { if(!o.tags.length) o.tags.push('Alternatif ' + (i+1)); });
+    opts.sort((a,b) => (b === pick) - (a === pick) || b.fit - a.fit);
+    return {why, src, w};
+  },
+
+  async rank(opts){
+    if(!opts.length) return null;
+    if(!Brain.on()) return Brain.apply(opts, Brain.fallbackW(), null, '', 'local');
+    try {
+      const raw = await llm({
+        system: Brain.system(),
+        messages: [{role:'user', content: JSON.stringify(Brain.payload(opts))}],
+        max_tokens: 300, mode: 'route'
+      });
+      const j = JSON.parse(raw.replace(/```json|```/g, '').trim());
+      const w = Brain.clean(j.agirlik);
+      const sug = Number.isInteger(j.oneri) && j.oneri >= 0 && j.oneri < opts.length ? j.oneri : null;
+      const why = String(j.gerekce || '').slice(0, 120);
+      return Brain.apply(opts, w, sug, why, 'llm');
+    } catch(e){
+      return Brain.apply(opts, Brain.fallbackW(), null, '', 'local');
+    }
+  }
+};
+
+/* ---------- rota tercihleri ekranı ---------- */
+const Prefs = {
+  open(){
+    const p = Brain.prefs();
+    S.raw(`<h2>Rota tercihlerim</h2>
+      <p style="color:var(--muted);margin:0 0 14px">Dia bu tercihlere ve o anki saate bakarak rotaları
+      hangi ölçüte göre sıralayacağını belirler.</p>
+      ${PREFS.map(x => `<label class="check" style="display:flex;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);color:var(--paper)">
+        <input type="checkbox" ${p[x.k] ? 'checked' : ''} onchange="Prefs.set('${x.k}',this.checked)"> ${x.n}</label>`).join('')}
+      <div style="font-size:13px;color:var(--muted);margin:18px 0 6px">Dia’ya not (isteğe bağlı)</div>
+      <textarea rows="2" maxlength="200" placeholder="Örn. tek başımayım, tanımadığım bir semtteyim"
+        oninput="Prefs.set('note',this.value)">${esc(p.note || '')}</textarea>
+      <label class="check" style="display:flex;padding:16px 0 4px;color:var(--paper)">
+        <input type="checkbox" ${p.llm === false ? '' : 'checked'} onchange="Prefs.set('llm',this.checked)">
+        Rota sıralamasında Dia’yı kullan</label>
+      <p class="note" style="margin-top:12px">Dia’ya yalnızca saat, tercihlerin ve rotaların ölçülmüş
+      değerleri gider. Adın, konumun ve kişi listen gönderilmez. Kapatırsan sıralama tamamen
+      cihazında, sabit kurallarla yapılır.</p>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="S.close()">Tamam</button>`);
+  },
+  set(k, v){
+    if(!state.user) return;
+    state.user.prefs = state.user.prefs || {};
+    state.user.prefs[k] = v;
+    saveUser();
+  }
+};
+
+/* ============================================================
+   KOMÜNİTE — Kadınlar İçin Topluluk Ağı
+   Gönderiler sunucuda (/api/community) paylaşılır; sunucuya ulaşılamazsa
+   bu cihazdaki yerel taslak akış gösterilir. Böylece sayfa her koşulda çalışır.
+   ============================================================ */
+const CATS_COM = ['genel','rota bilgisi','uyarı','güvenli nokta','soru','etkinlik'];
+const Com = {
+  cat: 'genel',
+  online: null,
+  boot(){ Com.seedLocal(); },
+
+  render(){
+    const el = $('#comBody'); if(!el) return;
+    const guest = !state.user || state.user.guest;
+    el.innerHTML = `
+      <p class="com-intro">Yol üzerine bilgi bırak, bir uyarı paylaş ya da soru sor. Paylaşımların
+      diğer kadın kullanıcılarla görünür — birlikte daha aydınlık bir harita çiziyoruz.</p>
+      ${guest ? `<div class="note" style="margin-bottom:16px">Paylaşım yapmak ve yanıtlamak için önce
+          <b>giriş yap</b>. Şimdilik akışı görüntüleyebilirsin.</div>` : `
+      <div class="com-compose">
+        <textarea id="comText" maxlength="800" placeholder="Örn. Bahar Sok. lambaları bu hafta onarıldı, akşam çok daha aydınlık."></textarea>
+        <div class="com-cats" id="comCats"></div>
+        <div class="com-send-row">
+          <input id="comArea" type="text" maxlength="80" placeholder="Semt / cadde (isteğe bağlı)">
+          <button class="btn btn-primary" onclick="Com.submit()">Paylaş</button>
+        </div>
+      </div>`}
+      <div class="com-status" id="comStatus"></div>
+      <div id="comFeed"></div>`;
+    if(!guest) Com.paintCats();
+    Com.load();
+  },
+  paintCats(){
+    const el = $('#comCats'); if(!el) return;
+    el.innerHTML = CATS_COM.map(c =>
+      `<button class="chip" aria-pressed="${c===Com.cat}" onclick="Com.setCat('${c}')">${esc(c)}</button>`).join('');
+  },
+  setCat(c){ Com.cat = c; Com.paintCats(); },
+
+  async load(){
+    const feed = $('#comFeed'), st = $('#comStatus'); if(!feed) return;
+    feed.innerHTML = `<div class="empty" style="padding:28px">Yükleniyor…</div>`;
+    try {
+      const d = await API.call('/api/community', { auth:true });
+      Com.online = true; if(st){ st.className = 'com-status'; st.textContent = ''; }
+      Com.paintFeed(d.posts || []);
+    } catch(e){
+      Com.online = false;
+      if(st){ st.className = 'com-status warn';
+        st.textContent = 'Sunucuya bağlanılamadı — bu cihazdaki taslak akış gösteriliyor.'; }
+      Com.paintFeed(Com.localFeed());
+    }
+  },
+  paintFeed(posts){
+    const feed = $('#comFeed'); if(!feed) return;
+    if(!posts.length){
+      feed.innerHTML = `<div class="empty"><b>Henüz paylaşım yok</b>İlk bilgiyi sen bırak — bir sokağın durumu, bir uyarı ya da bir soru.</div>`;
+      return;
+    }
+    feed.innerHTML = posts.map(Com.card).join('');
+  },
+  card(p){
+    const cat = p.category && p.category !== 'genel'
+      ? ` · <span style="color:var(--halo)">${esc(p.category)}</span>` : '';
+    const area = p.area ? `<div class="area">📍 ${esc(p.area)}</div>` : '';
+    const replies = (p.replies || []).map(r =>
+      `<div class="reply"><b>${esc(r.author)}</b><span class="rt">${timeAgo(r.createdAt)}</span><div>${esc(r.text)}</div></div>`).join('');
+    const canAct = !(!state.user || state.user.guest);
+    const id = esc(p.id);
+    return `<div class="post" data-id="${id}">
+      <div class="top">
+        <div class="av" style="background:${avatarColor(p.author)}">${esc(initials(p.author))}</div>
+        <div class="who"><b>${esc(p.author)}${p.mine ? ' · sen' : ''}</b><span>${timeAgo(p.createdAt)}${cat}</span></div>
+      </div>
+      <div class="body">${esc(p.text)}</div>
+      ${area}
+      <div class="acts">
+        <button class="${p.liked ? 'on' : ''}" onclick="Com.like('${id}')">♥ <span>${p.likeCount || 0}</span></button>
+        <button onclick="Com.toggleReplies('${id}')">💬 <span>${(p.replies || []).length}</span></button>
+      </div>
+      <div class="replies" id="rep-${id}">
+        ${replies}
+        ${canAct ? `<form class="reply-form" onsubmit="Com.reply(event,'${id}')">
+          <input maxlength="500" placeholder="Yanıt yaz…"><button type="submit">Gönder</button></form>` : ''}
+      </div>
+    </div>`;
+  },
+  toggleReplies(id){ const el = document.getElementById('rep-' + id); if(el) el.classList.toggle('on'); },
+
+  async submit(){
+    if(!state.user || state.user.guest){ toast('Giriş gerekli', 'Paylaşmak için giriş yap.'); return; }
+    const ta = $('#comText'), ar = $('#comArea');
+    const text = (ta.value || '').trim(), area = (ar.value || '').trim();
+    if(!text){ toast('Boş paylaşım', 'Önce bir şeyler yaz.'); return; }
+    const payload = { text, area, category: Com.cat };
+    ta.value = ''; ar.value = '';
+    try {
+      if(Com.online === false) throw { offline: true };
+      await API.call('/api/community', { method:'POST', body: payload });
+      addPoints(5, 'Komüniteye katkı');
+      Com.load();
+    } catch(e){
+      if(e && e.offline){ Com.localCreate(payload); addPoints(5, 'Komüniteye katkı'); Com.paintFeed(Com.localFeed()); }
+      else toast('Paylaşılamadı', (e && e.message) || 'Bir şey ters gitti.');
+    }
+  },
+  async like(id){
+    if(!state.user || state.user.guest){ toast('Giriş gerekli', 'Beğenmek için giriş yap.'); return; }
+    try {
+      if(Com.online === false) throw { offline: true };
+      const d = await API.call('/api/community/like', { method:'POST', body:{ id } });
+      Com.updateLike(d.post);
+    } catch(e){
+      if(e && e.offline){ Com.localLike(id); Com.paintFeed(Com.localFeed()); }
+      else toast('Olmadı', (e && e.message) || 'Beğenilemedi.');
+    }
+  },
+  async reply(e, id){
+    e.preventDefault();
+    const input = e.target.querySelector('input'); const text = (input.value || '').trim();
+    if(!text) return; input.value = '';
+    try {
+      if(Com.online === false) throw { offline: true };
+      const d = await API.call('/api/community/reply', { method:'POST', body:{ id, text } });
+      Com.replaceCard(id, d.post);
+    } catch(err){
+      if(err && err.offline){ Com.localReply(id, text); Com.paintFeed(Com.localFeed()); Com.toggleReplies(id); }
+      else toast('Olmadı', (err && err.message) || 'Yanıt gönderilemedi.');
+    }
+  },
+  updateLike(p){
+    const node = document.querySelector(`.post[data-id="${p.id}"]`); if(!node) return;
+    const btn = node.querySelector('.acts button');
+    btn.classList.toggle('on', !!p.liked);
+    btn.querySelector('span').textContent = p.likeCount || 0;
+  },
+  replaceCard(id, p){
+    const node = document.querySelector(`.post[data-id="${id}"]`); if(!node) return;
+    node.outerHTML = Com.card(p);
+    const rep = document.getElementById('rep-' + id); if(rep) rep.classList.add('on');
+  },
+
+  /* ---- cihaz-yerel taslak akış (sunucu yokken) ---- */
+  localFeed(){ return J.get('diana.localfeed', []); },
+  saveLocal(f){ J.set('diana.localfeed', f); },
+  seedLocal(){
+    if(J.get('diana.localfeed', null)) return;
+    const now = Date.now(), h = 36e5;
+    Com.saveLocal([
+      { id:'seed2', author:'Zeynep', area:'Meydan Durağı çevresi', category:'rota bilgisi',
+        text:'Son metro sonrası ön kapı tarafı hâlâ kalabalık, bekleme alanı aydınlık. Arka çıkışı kullanmayın.',
+        createdAt:new Date(now - 3*h).toISOString(), likeCount:6, liked:false,
+        replies:[{author:'Sude', text:'Teşekkürler, dün gece ben de ön taraftan bekledim.', createdAt:new Date(now-2*h).toISOString()}], mine:false },
+      { id:'seed1', author:'Elif', area:'Bahar Sokak', category:'uyarı',
+        text:'Bahar Sokak’taki iki lamba kırık, sokağın sonu görünmüyor. Karanlıkta uzun yoldan dolaşmanızı öneririm.',
+        createdAt:new Date(now - 26*h).toISOString(), likeCount:11, liked:false, replies:[], mine:false },
+    ]);
+  },
+  localCreate(p){
+    const f = Com.localFeed();
+    f.unshift({ id:'l' + Date.now().toString(36), author:(state.user && state.user.name) || 'Sen',
+      area:p.area, category:p.category, text:p.text, createdAt:new Date().toISOString(),
+      likeCount:0, liked:false, replies:[], mine:true });
+    Com.saveLocal(f);
+  },
+  localLike(id){
+    const f = Com.localFeed(); const p = f.find(x => x.id === id); if(!p) return;
+    p.liked = !p.liked; p.likeCount = (p.likeCount || 0) + (p.liked ? 1 : -1);
+    if(p.likeCount < 0) p.likeCount = 0; Com.saveLocal(f);
+  },
+  localReply(id, text){
+    const f = Com.localFeed(); const p = f.find(x => x.id === id); if(!p) return;
+    p.replies = p.replies || [];
+    p.replies.push({ author:(state.user && state.user.name) || 'Sen', text, createdAt:new Date().toISOString() });
+    Com.saveLocal(f);
+  }
+};
+
+/* ============================================================
+   DIA — yapay zekâ asistanı
+   ============================================================ */
+const QUICK = ['En yakın aydınlık yer neresi?','Gece 1’de nasıl dönerim?','Takip edildiğimi hissediyorum','Bu rota güvenli mi?'];
+const D = {
+  busy: false,
+  boot(){
+    $('#quick').innerHTML = QUICK.map(q => `<button class="chip" onclick="D.quick(this)">${q}</button>`).join('');
+    if(!state.chat.length){
+      D.push('dia', `Merhaba ${state.user && state.user.name ? state.user.name.split(' ')[0] : ''}. Ben Dia.\nNerede olduğunu ve nereye gitmek istediğini söyle; çevredeki ışık puanlarına bakıp en aydınlık yolu birlikte seçelim.\n\nAcil bir durumdaysan önce 112’yi ara.`);
+    }
+  },
+  push(who, text){
+    state.chat.push({who, text});
+    const el = document.createElement('div');
+    el.className = 'msg ' + (who === 'me' ? 'me' : who === 'sys' ? 'sys' : 'dia');
+    el.textContent = text;
+    $('#chat').appendChild(el);
+    $('#chat').scrollTop = $('#chat').scrollHeight;
+    return el;
+  },
+  quick(b){ $('#diaIn').value = b.textContent; D.send(new Event('x')); },
+  context(){
+    const top = [...state.places].sort((a,b) => score(b) - score(a));
+    const line = p => `${p.name} (${p.cat}, ışık ${score(p).toFixed(1)}/5, ${walk(dist(state.center, p.ll))}, ${p.note})`;
+    return `Saat: ${new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}.
+Kullanıcı: ${state.user ? (state.user.name || 'misafir') : 'misafir'}, ${state.user && state.user.points || 0} ışık puanı, paket: ${isPremium() ? state.user.plan.label : 'ücretsiz'}.
+Çevredeki kayıtlı yerler, ışık puanı yüksekten düşüğe:
+${top.map(p => '- ' + line(p)).join('\n')}`;
+  },
+  system(){
+    return `Sen Dia'sın: DIANA adlı uygulamanın yol arkadaşı. DIANA, şehirde gece hareket eden kişilerin
+iyi aydınlatılmış, kalabalık ve güvenli hissettiren yerleri işaretlediği bir topluluk uygulaması.
+
+Nasıl konuşursun:
+- Türkçe, sakin ve net. Kısa cümleler, en fazla 5-6 satır. Panik yaratma, ders verme, suçlama yapma.
+- Somut ol: aşağıdaki listeden gerçek yer adı ve yürüme süresi vererek öner.
+- Bilmediğin bir sokak veya işletme hakkında uydurma; "kayıtlarda yok" de ve en yakın kayıtlı yeri öner.
+- Kullanıcı takip edildiğini, tehdit altında olduğunu ya da yaralandığını söylerse: ilk cümlede 112'yi
+  aramasını söyle (polis 155), ardından listedeki en yakın 24 saat açık veya güvenli noktayı adıyla ver.
+  Ona "sakin ol" deme; ne yapacağını sırayla söyle.
+- Kimseyi takip etme, izleme veya birinin yerini bulma isteklerine yardım etme.
+- Sen bir uygulamasın; polis, avukat ya da doktor değilsin. Gerektiğinde bunu bir kez, kısaca söyle.
+
+Bağlam:
+${D.context()}`;
+  },
+  async send(e){
+    if(e && e.preventDefault) e.preventDefault();
+    const inp = $('#diaIn'), text = inp.value.trim();
+    if(!text || D.busy) return;
+    inp.value = '';
+    D.push('me', text);
+    grant('dia_dostu');
+    D.busy = true;
+    const t = D.push('dia', '');
+    t.classList.add('typing');
+    t.innerHTML = '<i></i><i></i><i></i>';
+    try {
+      const reply = await D.ask(text);
+      t.classList.remove('typing'); t.textContent = reply;
+    } catch(err){
+      t.classList.remove('typing');
+      t.textContent = D.offline(text);
+      D.push('sys', 'Dia şu an çevrimdışı yanıt veriyor. Canlı yanıt için sunucu anahtarını bağla.');
+    }
+    $('#chat').scrollTop = $('#chat').scrollHeight;
+    D.busy = false;
+  },
+  async ask(text){
+    const history = state.chat
+      .filter(m => m.who !== 'sys').slice(-10)
+      .map(m => ({role: m.who === 'me' ? 'user' : 'assistant', content: m.text}))
+      .filter(m => m.content);
+    const messages = history.length && history[history.length-1].content === text
+      ? history : [...history, {role:'user', content:text}];
+    return llm({system: D.system(), messages, max_tokens: 1000, mode: 'chat'});
+  },
+  text(d){
+    if(!d) return '';
+    if(Array.isArray(d.content)) return d.content.map(b => b.type === 'text' ? b.text : '').join('').trim();
+    if(d.choices && d.choices[0]) return (d.choices[0].message && d.choices[0].message.content || '').trim();
+    if(typeof d.text === 'string') return d.text.trim();
+    return '';
+  },
+  offline(text){
+    const t = text.toLocaleLowerCase('tr');
+    const near = [...state.places].sort((a,b) => score(b) - score(a));
+    const safe = near.find(p => p.cat === 'güvenli nokta') || near[0];
+    if(/takip|korku|tehdit|peşim|yardım|acil/.test(t)){
+      return `Önce 112’yi ara, hattı açık tut. Polis için 155.\nEn yakın açık nokta: ${safe.name}, ${walk(dist(state.center, safe.ll))}.\nAydınlık ve kalabalık tarafta yürü, kapalı geçitlere girme. Konumunu yakınındaki birine at.`;
+    }
+    const top = near.slice(0,3).map(p => `• ${p.name} — ışık ${score(p).toFixed(1)}, ${walk(dist(state.center, p.ll))}`).join('\n');
+    return `Şu an en yüksek ışık puanlı yerler:\n${top}\n\nHaritada birine dokunup “Aydınlık rota çiz” dersen yolu ara noktadan geçirerek gösteririm.`;
+  }
+};
+
+/* ---------- marka işareti: klasörde logo.svg / logo.png varsa onu kullanır ---------- */
+function paintBrand(src){
+  document.querySelectorAll('[data-brand]').forEach(el => {
+    el.innerHTML = src
+      ? `<img src="${src}" alt="DIANA">`
+      : '<svg viewBox="0 0 64 64"><use href="#dianaMark"/></svg>';
+  });
+}
+function loadBrand(){
+  paintBrand(null);
+  const probe = new Image();
+  probe.onload  = () => paintBrand(probe.src);
+  probe.onerror = () => { if(probe.src.endsWith('logo.svg')) probe.src = 'logo.png'; };
+  probe.src = 'logo.svg';
+}
+
+/* ============================================================
+   AÇILIŞ
+   ============================================================ */
+addEventListener('error', e => {
+  if(e && e.message) console.error(e.message);
+});
+(function boot(){
+  // giriş ekranı lamba alanı
+  const f = $('#lampfield');
+  for(let i = 0; i < 26; i++){
+    const s = document.createElement('i');
+    s.style.left = (Math.random()*100).toFixed(2) + '%';
+    s.style.top  = (Math.random()*100).toFixed(2) + '%';
+    s.style.animationDelay = (i * 0.07 + 0.15).toFixed(2) + 's';
+    f.appendChild(s);
+  }
+  loadBrand();
+  A.mode('login');
+  A.list();
+  // yanlış ortamda açılmışsa baştan söyle: file:// ve önizleme çerçevesi dış isteklere kapalı
+  (function envWarn(){
+    const p = location.protocol, framed = window.top !== window.self;
+    if(p !== 'file:' && !framed) return;
+    const w = document.createElement('p');
+    w.className = 'err';
+    w.style.cssText = 'color:var(--halo);font-size:12.5px;line-height:1.5';
+    w.textContent = p === 'file:'
+      ? 'Uygulamayı bilgisayarındaki dosyadan açtın. Bu modda tarayıcı adres arama, rota ve konum servislerine izin vermez. Netlify adresinden aç.'
+      : 'Uygulama bir önizleme çerçevesi içinde açılmış. Dış servisler engellenir; yeni sekmede site adresinden aç.';
+    const f = document.getElementById('authForm');
+    if(f) f.parentNode.insertBefore(w, f);
+  })();
+  if(!store.persistent){
+    const w = document.createElement('p');
+    w.className = 'err';
+    w.style.cssText = 'color:var(--halo);font-size:12.5px;line-height:1.5';
+    w.textContent = 'Bu tarayıcı yerel depolamaya izin vermiyor; hesabın sayfayı kapatınca silinir. ' +
+                    'Kalıcı kayıt için siteyi normal sekmede aç.';
+    const f = document.getElementById('authForm');
+    if(f) f.parentNode.insertBefore(w, f);
+  }
+  // PWA: ana ekrana eklenebilir ve çevrimdışı açılabilir olsun
+  if('serviceWorker' in navigator && location.protocol === 'https:')
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  // oturumu geri yükle: önce sunucu token'ı, olmazsa cihaz-yerel oturum
+  (async function restore(){
+    try {
+      const su = await Auth.me();
+      if(su){ state.user = su; A.enter(); return; }
+    } catch(e){ /* sunucu yok; yerele düş */ }
+    const mail = J.get('diana.session', null);
+    const u = mail && DB.find(mail);
+    if(u){ state.user = Auth.hydrate(u, true, true); A.enter(); }
+  })();
+})();
+
+/* ---------- ana ekrana ekleme ---------- */
+let deferredInstall = null;
+addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredInstall = e;
+  if(state.user) setTimeout(() => toast('DIANA’yı ana ekrana ekle', 'Profil sekmesinden tek dokunuşla kurabilirsin.'), 4000);
+});
+const Install = {
+  can(){
+    if(deferredInstall) return true;
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    return ios && !standalone;
+  },
+  async run(){
+    if(deferredInstall){
+      deferredInstall.prompt();
+      await deferredInstall.userChoice;
+      deferredInstall = null;
+      return;
+    }
+    S.raw(`<h2>Ana ekrana ekle</h2>
+      <p style="color:var(--muted);margin:0 0 14px">Safari’de alttaki <b>Paylaş</b> düğmesine dokun,
+      açılan listeden <b>Ana Ekrana Ekle</b>’yi seç. DIANA tam ekran bir uygulama gibi açılır,
+      adres çubuğu görünmez.</p>
+      <button class="btn btn-primary" onclick="S.close()">Anladım</button>`);
+  }
+};
+
+Object.assign(window, {A, Auth, API, P, Verify, U, M, R, Nav, Nav2, Fav, W, St, Lst, S, B, Me, Ad, Com, D, Brain, Prefs, Install, toast});
+
+</script>
+</body>
+</html>
