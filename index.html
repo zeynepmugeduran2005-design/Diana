@@ -2829,28 +2829,24 @@ const Ad = {
    sunucudaki /api/dia (OpenAI proxy) fonksiyonuna gider. Sunucu yoksa ya da
    yanıt boşsa çağıran taraf kendi çevrimdışı yanıtına düşer.
    ============================================================ */
-async function llm({system, messages, max_tokens = 800, mode = 'chat'}){
-  const body = {max_tokens, system, messages, mode};
-  const read = d => {
-    if(!d) return '';
-    if(typeof d.text === 'string' && d.text) return d.text.trim();
-    if(Array.isArray(d.content)) return d.content.map(x => x.type === 'text' ? x.text : '').join('').trim();
-    if(d.choices && d.choices[0]) return ((d.choices[0].message || {}).content || '').trim();
-    return '';
-  };
-  // Aynı origin fonksiyon yolları (yönlendirme varsa /api/dia, yoksa doğrudan fonksiyon)
-  const endpoints = ['/api/dia', '/.netlify/functions/dia'];
-  let lastErr;
-  for(const url of endpoints){
-    try {
-      const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-      if(r.status === 404){ continue; }              // bu yolda fonksiyon yok, diğerini dene
-      const out = read(await r.json());
-      if(r.ok && out) return out;
-      lastErr = new Error('dia ' + r.status);         // 5xx (ör. anahtar yok) → çevrimdışına düş
-    } catch(e){ lastErr = e; }
+async function llm({system, messages, max_tokens = 800, mode = 'chat'}) {
+  const GEMINI_API_KEY = "AQ.Ab8RN6L4_IGZgH7dTmnWdxUugKA18NXbRaJUYo_d64lfHq6dDQ";
+  const lastMsg = messages && messages.length > 0 ? messages[messages.length - 1].content : "";
+  const promptText = (system ? system + "\n\n" : "") + lastMsg;
+
+  try {
+    const res = await fetch(https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: promptText }] }]
+      })
+    });
+    const data = await res.json();
+    return data.candidates[0].content.parts[0].text;
+  } catch (err) {
+    return "Şu an bağlantı kurulamadı. En yakın aydınlık caddeye ve açık noktalara doğru ilerlemenizi öneririm.";
   }
-  throw lastErr || new Error('llm');
 }
 
 /* ============================================================
