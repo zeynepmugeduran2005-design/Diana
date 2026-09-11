@@ -551,6 +551,8 @@ hr.sep{border:0;border-top:1px solid rgba(255,255,255,.07);margin:20px 0}
           </div>
           <div class="gores" id="destRes"></div>
           <div class="modes" id="modes"></div>
+          <button class="btn btn-primary" id="geoCta" style="margin-top:10px;display:none"
+                  onclick="M.locate()">📍 Konumumu paylaş</button>
           <div class="pickrow" style="margin:10px 2px 2px">
             <button class="chip" onclick="Nav.focusFrom()">Nerede olduğumu yazayım</button>
             <button class="chip" onclick="Nav.pick('f')">Başlangıcı haritadan seç</button>
@@ -709,6 +711,17 @@ const API = {
    MapTiler'dan ücretsiz anahtar alıp buraya yazarsan harita en güvenilir katmanı kullanır.
    Boş bırakılırsa CARTO → OpenStreetMap → Esri sırasıyla denenir. */
 const MAP_KEY = '';
+
+/* ---------- DIA / LLM istemci ayarı ----------
+   GÜVENLİK UYARISI: Aşağıya anahtar yazarsan, bu dosya yayınlandığında anahtar
+   herkese görünür (kaynağı görüntüle) ve kötüye kullanılabilir. TERCİH EDİLEN yol
+   anahtarı SUNUCUDA (Netlify env: GEMINI_API_KEY / OPENAI_API_KEY) tutmaktır;
+   o durumda burayı BOŞ bırak, DIA otomatik /api/dia üzerinden çalışır.
+   Yalnızca fonksiyon deploy edemediğin bir DEMO için, Google AI Studio'dan
+   HTTP-referrer KISITLI bir Gemini anahtarı (AIza... ile başlar) alıp buraya
+   koyabilirsin — kısıtlı anahtar, riski azaltır ama tümüyle ortadan kaldırmaz. */
+const GEMINI_KEY = '';
+const GEMINI_MODEL = 'gemini-1.5-flash';
 
 /* ---------- durum ---------- */
 const state = {
@@ -1419,14 +1432,16 @@ const M = {
     M.layer(0);
     M.chips(); M.paint();
     if(isSafari || isIOS){
-      // Safari, sayfa açılır açılmaz gelen konum isteğini çoğu zaman sormadan reddediyor;
-      // izin kutusunun çıkması için isteğin bir dokunuşla başlaması gerekiyor.
-      Nav.status('Konumunu bulmak için sağdaki <b>◎</b> düğmesine dokun.', 'wait');
+      // Safari/iOS, sayfa açılır açılmaz gelen konum isteğini sormadan reddeder;
+      // izin kutusunun çıkması için isteğin bir DOKUNUŞLA başlaması gerekir.
+      M.showGeoCta(true);
+      Nav.status('Konumun için <b>📍 Konumumu paylaş</b> düğmesine dokun. Safari izin kutusunu yalnızca dokununca gösterir.', 'wait');
     } else {
       Nav.status('Konumun bulunuyor…', 'wait');
       M.locate(true);
-      setTimeout(() => { if(!state.located && !state.manualStart)
-        Nav.status('Konumun alınamadı. Sağdaki ◎ ile tekrar dene ya da “Nereden” alanına yerini yaz.', 'warn'); }, 13000);
+      setTimeout(() => { if(!state.located && !state.manualStart){
+        M.showGeoCta(true);
+        Nav.status('Konumun alınamadı. <b>📍 Konumumu paylaş</b> ile tekrar dene ya da “Nereden” alanına yerini yaz.', 'warn'); } }, 13000);
     }
     // Leaflet gizli/yeni ölçülen kapsayıcıda boyutu kaçırabiliyor
     [0, 120, 400, 1000].forEach(ms => setTimeout(() => state.map.invalidateSize(), ms));
@@ -1504,22 +1519,28 @@ const M = {
       <button class="btn-line" style="margin:8px auto 0" onclick="S.close();Nav.focusFrom()">Yerimi elle yazayım</button>`);
   },
 
+  showGeoCta(on){ const b = $('#geoCta'); if(b) b.style.display = on ? 'block' : 'none'; },
+
   locate(silent){
     if(!navigator.geolocation){
       state.located = false;
       Nav.status('Bu tarayıcı konum servisini desteklemiyor. Başlangıcı elle yaz.', 'warn');
       return;
     }
-    if(location.protocol !== 'https:' && location.hostname !== 'localhost'){
-      Nav.status('Konum yalnızca https adreste çalışır. Siteyi https ile aç ya da başlangıcı elle yaz.', 'warn');
+    // Güvenli bağlam şart: https ya da localhost. file:// ve http:// Safari'de sessizce engellenir.
+    if(!window.isSecureContext && location.hostname !== 'localhost'){
+      M.showGeoCta(false);
+      Nav.status('Konum yalnızca <b>güvenli (https)</b> adreste çalışır. Uygulamayı dosyadan değil, Netlify <b>https</b> adresinden aç; ya da başlangıcı “Nereden” alanına elle yaz.', 'warn');
       return;
     }
     if(!state.manualStart) Nav.status('Konumun bulunuyor…', 'wait');
+    const t0 = Date.now();
     navigator.geolocation.getCurrentPosition(
       pos => {
         const ll = [pos.coords.latitude, pos.coords.longitude];
         const acc = Math.round(pos.coords.accuracy || 0);
         state.located = true; state.manualStart = false;
+        M.showGeoCta(false);
         M.setCenter(ll, 'Konumum');
         Nav.sync();
         Nav.status(acc > 300
@@ -1529,11 +1550,21 @@ const M = {
       },
       err => {
         state.located = false;
-        const msg = err.code === 1
-          ? 'Konum izni verilmedi. <button class="btn-line" style="padding:0;font-size:12.5px" onclick="M.help()">Nasıl açılır?</button>'
-          : err.code === 3
-          ? 'Konum zaman aşımına uğradı. Sağdaki ◎ ile tekrar dene ya da başlangıcı elle yaz.'
-          : 'Konum alınamadı. <button class="btn-line" style="padding:0;font-size:12.5px" onclick="M.help()">Nasıl açılır?</button>';
+        // İzin reddi çok hızlı geldiyse (kutu gösterilmeden), sorun cihaz/sistem
+        // düzeyinde Konum Servisleri'nin kapalı olmasıdır — farklı yönlendirme ver.
+        const fast = Date.now() - t0 < 700;
+        const nasil = ' <button class="btn-line" style="padding:0;font-size:12.5px" onclick="M.help()">Nasıl açılır?</button>';
+        let msg;
+        if(err.code === 1){
+          msg = fast
+            ? 'Konum servisi <b>sistemde kapalı</b> görünüyor (Safari izin kutusu hiç çıkmadı). iPhone: Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → <b>Açık</b>, sonra <b>Safari Web Siteleri</b> → “Kullanırken”. Mac: Sistem Ayarları → Gizlilik → Konum Servisleri → <b>Safari açık</b>.' + nasil
+            : 'Konum izni verilmedi.' + nasil;
+        } else if(err.code === 3){
+          msg = 'Konum zaman aşımına uğradı. <b>📍 Konumumu paylaş</b> ile tekrar dene ya da başlangıcı elle yaz.';
+        } else {
+          msg = 'Konum alınamadı.' + nasil;
+        }
+        M.showGeoCta(true);
         if(!state.manualStart) Nav.status(msg, 'warn');
         if(!silent) toast('Konum yok', 'Başlangıç alanına nerede olduğunu yazabilirsin.');
         M.me(state.center, false);
@@ -2825,9 +2856,9 @@ const Ad = {
 
 /* ============================================================
    LLM KATMANI — DIA'nın dinamik yapay zekâsı
-   Tek giriş noktası. API anahtarı hiçbir zaman istemcide durmaz: istek
-   sunucudaki /api/dia (OpenAI proxy) fonksiyonuna gider. Sunucu yoksa ya da
-   yanıt boşsa çağıran taraf kendi çevrimdışı yanıtına düşer.
+   Tercih edilen yol: istek sunucudaki /api/dia fonksiyonuna gider ve anahtar
+   yalnızca sunucuda (env) durur. Sunucu yoksa VE istemcide GEMINI_KEY tanımlıysa
+   (yalnızca demo için) doğrudan Gemini çağrılır. Hiçbiri yoksa çevrimdışı yanıt.
    ============================================================ */
 async function llm({system, messages, max_tokens = 800, mode = 'chat'}){
   const body = {max_tokens, system, messages, mode};
@@ -2838,7 +2869,7 @@ async function llm({system, messages, max_tokens = 800, mode = 'chat'}){
     if(d.choices && d.choices[0]) return ((d.choices[0].message || {}).content || '').trim();
     return '';
   };
-  // Aynı origin fonksiyon yolları (yönlendirme varsa /api/dia, yoksa doğrudan fonksiyon)
+  // 1) Aynı origin fonksiyon yolları (güvenli, önerilen)
   const endpoints = ['/api/dia', '/.netlify/functions/dia'];
   let lastErr;
   for(const url of endpoints){
@@ -2847,10 +2878,31 @@ async function llm({system, messages, max_tokens = 800, mode = 'chat'}){
       if(r.status === 404){ continue; }              // bu yolda fonksiyon yok, diğerini dene
       const out = read(await r.json());
       if(r.ok && out) return out;
-      lastErr = new Error('dia ' + r.status);         // 5xx (ör. anahtar yok) → çevrimdışına düş
+      lastErr = new Error('dia ' + r.status);         // 5xx (ör. anahtar yok) → sonraki yönteme
     } catch(e){ lastErr = e; }
   }
+  // 2) Sunucu yoksa: yalnızca demo için doğrudan Gemini (anahtar istemcide — riskli)
+  if(GEMINI_KEY){
+    try { const out = await geminiDirect({system, messages, max_tokens, mode}); if(out) return out; }
+    catch(e){ lastErr = e; }
+  }
   throw lastErr || new Error('llm');
+}
+
+/* Tarayıcıdan doğrudan Gemini çağrısı — SADECE GEMINI_KEY doluysa (demo yolu). */
+async function geminiDirect({system, messages, max_tokens = 800, mode = 'chat'}){
+  const contents = (messages || [])
+    .map(m => ({ role: m.role === 'assistant' ? 'model' : 'user',
+                 parts: [{ text: typeof m.content === 'string' ? m.content : '' }] }))
+    .filter(c => c.parts[0].text);
+  const gen = { maxOutputTokens: Math.min(max_tokens, 1500), temperature: mode === 'route' ? 0.2 : 0.6 };
+  if(mode === 'route') gen.responseMimeType = 'application/json';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`;
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ contents, systemInstruction:{ parts:[{ text: system }] }, generationConfig: gen }) });
+  const d = await r.json();
+  if(!r.ok) throw new Error((d.error && d.error.message) || 'gemini');
+  return (d.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
 }
 
 /* ============================================================
